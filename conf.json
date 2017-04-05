@@ -1,0 +1,110 @@
+{
+    "APIKey": "",
+    "InstanceId": "",
+    "UpdateUserType": false,
+    "UserRoleAction": "Create",
+    "AzureConf": {
+        "Tenant": "",
+        "ClientID": "",
+        "ClientSecret": "",
+        "Filter": "",
+        "UserID": "mail",
+        "Debug": false
+    },
+    "UserMapping":{
+        "userId":"{{.mail}}",
+        "UserType":"basic",
+        "Name":"{{.givenName}} {{.surname}}",
+        "Password":"",
+        "FirstName":"{{.givenName}}",
+        "LastName":"{{.surname}}",
+        "JobTitle":"",
+        "Site":"{{.physicalDeliverOfficeName}}",
+        "Phone":"{{.telephoneNumber}}",
+        "Email":"{{.mail}}",
+        "Mobile":"{{.mobile}}",
+        "AbsenceMessage":"",
+        "TimeZone":"",
+        "Language":"",
+        "DateTimeFormat":"",
+        "DateFormat":"",
+        "TimeFormat":"",
+        "CurrencySymbol":"",
+        "CountryCode":""
+    },
+    "UserAccountStatus":{
+        "Action":"Both",
+        "Enabled": false,
+        "Status":"active"
+    },
+    "UserProfileMapping":{
+        "MiddleName":"",
+        "JobDescription":"",
+        "Manager":"{{.manager}}",
+        "WorkPhone":"",
+        "Qualifications":"",
+        "Interests":"",
+        "Expertise":"",
+        "Gender":"",
+        "Dob":"",
+        "Nationality":"",
+        "Religion":"",
+        "HomeTelephone":"{{.telephoneNumber}}",
+        "SocialNetworkA":"",
+        "SocialNetworkB":"",
+        "SocialNetworkC":"",
+        "SocialNetworkD":"",
+        "SocialNetworkE":"",
+        "SocialNetworkF":"",
+        "SocialNetworkG":"",
+        "SocialNetworkH":"",
+        "PersonalInterests":"",
+        "homeAddress":"",
+        "PersonalBlog":"",
+        "Attrib1":"",
+    	"Attrib2":"",
+    	"Attrib3":"",
+    	"Attrib4":"",
+    	"Attrib5":"",
+    	"Attrib6":"",
+    	"Attrib7":"",
+    	"Attrib8":""
+    }
+    , "UserManagerMapping":{
+        "Action":"Both"
+        , "Enabled":true
+    }
+    , "Roles":[
+        "Basic User Role"
+    ]
+    , "SiteLookup":{
+        "Action":"Both"
+        , "Enabled": true
+    }
+    , "ImageLink":{
+        "Action":"Both"
+        , "Enabled": false
+        , "UploadType": "URL"
+        , "ImageType": "jpg"
+        , "URI": "http://whatever.server.com/userdb/images/{{.mail}}.jpg"
+    }
+    , "OrgLookup":{
+        "Action":"Both"
+        , "Enabled":true
+        , "OrgUnits":[
+            {
+                "Attribute":"{{.department}}",
+                "Type":2,
+                "Membership":"member",
+                "TasksView":false,
+                "TasksAction":false
+            }, {
+                "Attribute":"{{.companyName}}",
+                "Type":5,
+                "Membership":"member",
+                "TasksView":false,
+                "TasksAction":false
+            }
+        ]
+    }
+}
