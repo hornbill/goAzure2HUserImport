@@ -71,6 +71,8 @@ var (
 	bufferMutex         = &sync.Mutex{}
 	worker              sync.WaitGroup
 	maxGoroutines       = 6
+	globalBearerToken   = ""
+	globalTokenExpiry   int64
 
 	userProfileMappingMap = map[string]string{
 		"MiddleName":        "middleName",
@@ -788,6 +790,13 @@ func getInstanceDAVURL() string {
 
 func getBearerToken() (string, error) {
 
+	currentEpoch := time.Now().Unix()
+	if globalBearerToken != "" && ((currentEpoch + 200) < globalTokenExpiry) {
+		logger(1, "[SCRIPT] Re-using BearerToken", false)
+		return globalBearerToken, nil
+	}
+
+	logger(1, "[SCRIPT] Generating BearerToken", false)
 	strClientID := AzureImportConf.AzureConf.ClientID
 	strClientSecret := AzureImportConf.AzureConf.ClientSecret
 	data := url.Values{}
@@ -848,8 +857,9 @@ func getBearerToken() (string, error) {
 	}
 
 	q := f.(map[string]interface{})
-
 	strBearerToken := q["access_token"].(string)
+	globalBearerToken = strBearerToken
+	globalTokenExpiry, _ = strconv.ParseInt(q["expires_on"].(string), 10, 64)
 
 	return strBearerToken, nil
 }
@@ -1181,18 +1191,87 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 		return
 	}
 
+	strContentType := "image/jpeg"
+
 	if strings.ToUpper(AzureImportConf.ImageLink.UploadType) != "URI" {
 		// get binary to upload via WEBDAV and then set value to relative "session" URI
 		client := http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
 			Timeout: time.Duration(10 * time.Second),
 		}
 
 		rel_link := "session/" + UserID
-		url := AzureImportConf.DAVURL + rel_link
+		strDAVurl := AzureImportConf.DAVURL + rel_link
 
 		var imageB []byte
 		var Berr error
 		switch strings.ToUpper(AzureImportConf.ImageLink.UploadType) {
+		case "AZURE":
+
+			strBearerToken, err := getBearerToken()
+			//    fmt.Println(strBearerToken)
+			if err != nil || strBearerToken == "" {
+				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
+				return
+			}
+
+			//strURL := "https://graph.microsoft.com/v1.0/users"
+			strTentant := AzureImportConf.AzureConf.Tenant
+			//strURL := "https://graph.windows.net/" + strTentant + "/users/[user_id]/thumbnailPhoto"
+			strURL := "https://graph.windows.net/" + strTentant + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
+
+			data := url.Values{}
+			data.Set("api-version", "1.6")
+			strData := data.Encode()
+			strURL += strData
+			//fmt.Println(strURL)
+			req, err := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))
+			req.Header.Set("User-Agent", "Go-http-client/1.1")
+			req.Header.Set("Authorization", "Bearer "+strBearerToken)
+			duration := time.Second * time.Duration(30)
+			imgclient := &http.Client{Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			}, Timeout: duration}
+			resp, err := imgclient.Do(req)
+			if err != nil {
+				logger(4, " [Image] Connection Error: "+fmt.Sprintf("%v", err), false)
+				return
+			}
+			defer resp.Body.Close()
+
+			//-- Check for HTTP Response
+			if resp.StatusCode != 200 {
+				if resp.StatusCode != 404 {
+					errorString := fmt.Sprintf("Invalid HTTP Response: %d", resp.StatusCode)
+					err = errors.New(errorString)
+					logger(4, " [Image] Error: "+fmt.Sprintf("%v", err), false)
+				} else {
+					logger(4, " [Image] Not Found", false)
+					// image exists
+					//QQQ, _ := ioutil.ReadAll(resp.Body)
+					//buf:= new(bytes.Buffer)
+					//buf.ReadFrom(QQQ)
+					//s:=buf.String()
+					//fmt.Println(string(QQQ))
+					//fmt.Println(imageB.String())
+				}
+				//Drain the body so we can reuse the connection
+				io.Copy(ioutil.Discard, resp.Body)
+				return
+			}
+			logger(3, "[Image] Connection Successful", false)
+
+			imageB, err = ioutil.ReadAll(resp.Body)
+			if err != nil {
+				logger(4, " [Image] Cannot read the body of the response", false)
+				return
+			}
+			strContentType = resp.Header.Get("Content-Type")
+			//fmt.Println(strContentType)
+			//fmt.Println(imageB)
+
 		case "URL":
 			resp, err := http.Get(value)
 			if err != nil {
@@ -1207,6 +1286,7 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 				buffer.WriteString(loggerGen(4, "Unsuccesful download: "+fmt.Sprintf("%v", resp.StatusCode)))
 				return
 			}
+
 		default:
 			imageB, Berr = hex.DecodeString(value[2:]) //stripping leading 0x
 			if Berr != nil {
@@ -1218,8 +1298,8 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 		//WebDAV upload
 		if len(imageB) > 0 {
 			putbody := bytes.NewReader(imageB)
-			req, Perr := http.NewRequest("PUT", url, putbody)
-			req.Header.Set("Content-Type", "image/jpeg")
+			req, Perr := http.NewRequest("PUT", strDAVurl, putbody)
+			req.Header.Set("Content-Type", strContentType)
 			req.Header.Add("Authorization", "ESP-APIKEY "+AzureImportConf.APIKey)
 			req.Header.Set("User-Agent", "Go-http-client/1.1")
 			response, Perr := client.Do(req)
