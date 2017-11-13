@@ -7,9 +7,21 @@
         "Tenant": "",
         "ClientID": "",
         "ClientSecret": "",
-        "Filter": "",
+        "UserFilter": "startswith(displayName,'Dave')",
         "UserID": "mail",
-        "Debug": false
+        "Debug": false,
+        "APIVersion":"1.6",
+        "Search":"groups",
+        "UsersByGroupID":[
+            {
+                "ObjectID":"Group Object ID",
+                "Name":"Group Object Name"
+            },
+            {
+                "ObjectID":"Second Group Object ID",
+                "Name":"Second Group Object Name"
+            }
+        ]
     },
     "UserMapping":{
         "userId":"{{.mail}}",
