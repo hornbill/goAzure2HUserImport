@@ -1,3 +1,9 @@
+## 1.4.0 (21st November, 2017)
+
+Features:
+
+  - Incorporated paging to go beyond default 100 item search limit.
+
 ## 1.3.0 (13th November, 2017)
 
 Features:

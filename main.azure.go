@@ -94,7 +94,10 @@ func queryUsers() (bool, []map[string]interface{}) {
 	}
 
 	strTenant := AzureImportConf.AzureConf.Tenant
-	strURL := "https://graph.windows.net/" + strTenant + "/users?"
+	strURL := "https://graph.windows.net/" + strTenant + "/users?" //$top=1&"
+    if (strAzurePagerToken != ""){
+        strURL += "$skiptoken=" + strAzurePagerToken + "&"
+    }
 
 	data := url.Values{}
 	data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
@@ -141,7 +144,7 @@ func queryUsers() (bool, []map[string]interface{}) {
 		logger(4, " [Azure] Cannot read the body of the response", true)
 		return false, ArrUserMaps
 	}
-
+    
 	var f interface{}
 	qerr := json.Unmarshal(body, &f)
 	if qerr != nil {
@@ -162,7 +165,18 @@ func queryUsers() (bool, []map[string]interface{}) {
 			ArrUserMaps = append(ArrUserMaps, blubber)
 		}
 	}
-
+    if strNextLink, ok := q["odata.nextLink"]; ok {
+        //strAzurePagerToken = strNextLink.(string)
+        //re := regexp.MustCompile("skiptoken=(.*)&?")
+        //strNewPagerToken := re.FindString(strAzurePagerToken)
+        arrNewPagerToken := strings.SplitAfter(strNextLink.(string), "skiptoken=")
+        strTokenToTidy := strings.SplitAfter(arrNewPagerToken[1], "&")
+        logger(1, " [Azure] Determined Token: " + strTokenToTidy[0], false)
+        strAzurePagerToken = strTokenToTidy[0];
+    } else {
+        logger(1, " [Azure] No Skip Token Found", false)
+        strAzurePagerToken = "";
+    }
 	logger(2, fmt.Sprintf("[Azure] Found %d results", intUserCount), false)
 	return true, ArrUserMaps
 }
@@ -182,8 +196,10 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 	}
 
 	strTenant := AzureImportConf.AzureConf.Tenant
-	strURL := "https://graph.windows.net/" + strTenant + "/groups/" + groupID + "/$links/members?api-version=" + AzureImportConf.AzureConf.APIVersion
-
+	strURL := "https://graph.windows.net/" + strTenant + "/groups/" + groupID + "/$links/members?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+    if (strAzurePagerToken != ""){
+        strURL += "&$skiptoken=" + strAzurePagerToken
+    }
 	logger(1, "[AZURE] API URL: "+strURL, false)
 	req, err := http.NewRequest("GET", strURL, nil)
 	req.Header.Set("Content-Type", "application/json")
@@ -299,6 +315,19 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 			}
 		}
 	}
+
+    if strNextLink, ok := q["odata.nextLink"]; ok {
+        //strAzurePagerToken = strNextLink.(string)
+        //re := regexp.MustCompile("skiptoken=(.*)&?")
+        //strNewPagerToken := re.FindString(strAzurePagerToken)
+        arrNewPagerToken := strings.SplitAfter(strNextLink.(string), "skiptoken=")
+        strTokenToTidy := strings.SplitAfter(arrNewPagerToken[1], "&")
+        logger(1, " [Azure] Determined Token: " + strTokenToTidy[0], false)
+        strAzurePagerToken = strTokenToTidy[0];
+    } else {
+        logger(1, " [Azure] No Skip Token Found", false)
+        strAzurePagerToken = "";
+    }
 
 	logger(2, fmt.Sprintf("[Azure] Found %d Users", intUserCount), true)
 	if intUserCount > 0 {

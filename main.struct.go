@@ -7,7 +7,7 @@ import (
 
 const (
 	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	version      = "1.3.0"
+	version      = "1.4.0"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"
@@ -30,6 +30,7 @@ var (
 	configWorkers       int
 	configMaxRoutines   string
 	timeNow             string
+	strAzurePagerToken  = ""
 	startTime           time.Time
 	endTime             time.Duration
 	errorCount          uint64
