@@ -8,7 +8,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"html/template"
+	"text/template"
 	"io"
 	"io/ioutil"
 	"log"

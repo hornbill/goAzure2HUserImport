@@ -1,3 +1,9 @@
+## 1.4.1 (1st December, 2017)
+
+Fixes:
+
+  - Amended template processing at text only instead of HTML.
+
 ## 1.4.0 (21st November, 2017)
 
 Features:
