@@ -701,7 +701,7 @@ func userSetStatus(userID string, status string, buffer *bytes.Buffer) bool {
 	}
 	if xmlRespon.MethodResult != constOK {
 		if xmlRespon.State.ErrorRet != "Failed to update account status (target and the current status is the same)." {
-			buffer.WriteString(loggerGen(4, "Unable to Set User Status 111: "+xmlRespon.State.ErrorRet))
+			buffer.WriteString(loggerGen(4, "Unable to Set User Status (" +fmt.Sprintf("%v", status) + "): "+xmlRespon.State.ErrorRet))
 			return false
 		}
 		buffer.WriteString(loggerGen(1, "User Status Already Set to: "+fmt.Sprintf("%v", status)))

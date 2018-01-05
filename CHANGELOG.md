@@ -1,3 +1,9 @@
+## 1.4.2 (5th January, 2018)
+
+Fixes:
+
+  - Amended an error message.
+
 ## 1.4.1 (1st December, 2017)
 
 Fixes:
