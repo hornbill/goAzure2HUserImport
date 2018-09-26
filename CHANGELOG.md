@@ -1,3 +1,9 @@
+## 1.4.3 (September 26th, 2018)
+
+Fixes:
+
+  - Recoding to use entityBrowseRecords2 instead of entityBrowseRecords.
+  
 ## 1.4.2 (5th January, 2018)
 
 Fixes:
