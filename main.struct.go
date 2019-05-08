@@ -7,7 +7,7 @@ import (
 
 const (
 	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	version      = "1.4.3"
+	version      = "1.4.4"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"

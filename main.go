@@ -63,30 +63,30 @@ func main() {
 	if AzureImportConf.AzureConf.Search == "users" {
 		//Get users, process accordingly
 		logger(2, "Querying Users with filter ["+AzureImportConf.AzureConf.UserFilter+"]", true)
-        for ok := true; ok; ok = (strAzurePagerToken != "") { // do {...} while
-            var boolSQLUsers, arrUsers = queryUsers()
-            if boolSQLUsers {
-                processUsers(arrUsers)
-            } else {
-                logger(3, "No (further) Users found in User search", true)
-                return
-            }
-        }
+		for ok := true; ok; ok = (strAzurePagerToken != "") { // do {...} while
+			var boolSQLUsers, arrUsers = queryUsers()
+			if boolSQLUsers {
+				processUsers(arrUsers)
+			} else {
+				logger(3, "No (further) Users found in User search", true)
+				return
+			}
+		}
 	}
 	if AzureImportConf.AzureConf.Search == "groups" {
 		for _, group := range AzureImportConf.AzureConf.UsersByGroupID {
 			//Get users, process accordingly
 			logger(2, "Querying Group ["+group.Name+"]", true)
 
-            for ok := true; ok; ok = (strAzurePagerToken != "") { // do {...} while
-                var boolSQLUsers, arrUsers = queryGroup(group.ObjectID)
-                    if boolSQLUsers {
-                        processUsers(arrUsers)
-                    } else {
-                        logger(3, "No (further) Users found in Group ["+group.Name+"]", true)
-                    }
-                }
-            }
+			for ok := true; ok; ok = (strAzurePagerToken != "") { // do {...} while
+				var boolSQLUsers, arrUsers = queryGroup(group.ObjectID)
+				if boolSQLUsers {
+					processUsers(arrUsers)
+				} else {
+					logger(3, "No (further) Users found in Group ["+group.Name+"]", true)
+				}
+			}
+		}
 	}
 	outputEnd()
 }

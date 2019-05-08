@@ -8,7 +8,7 @@
         "ClientID": "",
         "ClientSecret": "",
         "UserFilter": "startswith(displayName,'Dave')",
-        "UserID": "mail",
+        "UserID": "userPrincipalName",
         "Debug": false,
         "APIVersion":"1.6",
         "Search":"groups",

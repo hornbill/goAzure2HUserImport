@@ -8,7 +8,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"text/template"
 	"io"
 	"io/ioutil"
 	"log"
@@ -16,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/hornbill/goApiLib"
@@ -701,7 +701,7 @@ func userSetStatus(userID string, status string, buffer *bytes.Buffer) bool {
 	}
 	if xmlRespon.MethodResult != constOK {
 		if xmlRespon.State.ErrorRet != "Failed to update account status (target and the current status is the same)." {
-			buffer.WriteString(loggerGen(4, "Unable to Set User Status (" +fmt.Sprintf("%v", status) + "): "+xmlRespon.State.ErrorRet))
+			buffer.WriteString(loggerGen(4, "Unable to Set User Status ("+fmt.Sprintf("%v", status)+"): "+xmlRespon.State.ErrorRet))
 			return false
 		}
 		buffer.WriteString(loggerGen(1, "User Status Already Set to: "+fmt.Sprintf("%v", status)))
@@ -818,7 +818,7 @@ func searchSite(siteName string, buffer *bytes.Buffer) (bool, int) {
 	espXmlmc.OpenElement("searchFilter")
 	espXmlmc.SetParam("column", "h_site_name")
 	espXmlmc.SetParam("value", siteName)
-	// espXmlmc.SetParam("h_site_name", siteName)
+	//espXmlmc.SetParam("h_site_name", siteName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
@@ -905,9 +905,10 @@ func searchManager(managerName string, buffer *bytes.Buffer) (bool, string) {
 	espXmlmc.SetParam("entity", "UserAccount")
 	espXmlmc.SetParam("matchScope", "all")
 	espXmlmc.OpenElement("searchFilter")
-//	espXmlmc.SetParam("h_name", managerName)
-	espXmlmc.SetParam("column", "h_name")
+	espXmlmc.SetParam("column", "h_user_id")
 	espXmlmc.SetParam("value", managerName)
+	//espXmlmc.SetParam("h_user_id", managerName)
+	//	espXmlmc.SetParam("h_name", managerName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 	XMLUserSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
@@ -926,7 +927,7 @@ func searchManager(managerName string, buffer *bytes.Buffer) (bool, string) {
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.UserName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.UserName) == strings.ToLower(managerName) {
+				if strings.ToLower(xmlRespon.Params.RowData.Row.UserID) == strings.ToLower(managerName) {
 
 					strReturn = xmlRespon.Params.RowData.Row.UserID
 					boolReturn = true

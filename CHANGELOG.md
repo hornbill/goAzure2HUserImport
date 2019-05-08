@@ -1,4 +1,10 @@
-## 1.4.3 (September 26th, 2018)
+## 1.4.4 (8th May, 2019)
+
+Fixes:
+
+  - Fixing Manager Lookup
+  
+## 1.4.3 (26th September, 2018)
 
 Fixes:
 
