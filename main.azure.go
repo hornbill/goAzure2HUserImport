@@ -29,7 +29,7 @@ func getBearerToken() (string, error) {
 	data.Set("grant_type", "client_credentials")
 	data.Set("client_secret", strClientSecret)
 	data.Set("client_id", strClientID)
-	data.Set("resource", "https://graph.windows.net")
+	data.Set("resource", apiResource)
 	strData := data.Encode()
 	strTentant := AzureImportConf.AzureConf.Tenant
 	strURL := "https://login.microsoftonline.com/" + strTentant + "/oauth2/token"
@@ -93,14 +93,16 @@ func queryUsers() (bool, []map[string]interface{}) {
 		return false, ArrUserMaps
 	}
 
-	strTenant := AzureImportConf.AzureConf.Tenant
-	strURL := "https://graph.windows.net/" + strTenant + "/users?" //$top=1&"
+	//strTenant := AzureImportConf.AzureConf.Tenant
+	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users?" //$top=1&"
+	//strURL := "https://graph.microsoft.com/" + AzureImportConf.AzureConf.APIVersion + "/users?" //$top=1&"
+	strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users?" //$top=1&"
 	if strAzurePagerToken != "" {
 		strURL += "$skiptoken=" + strAzurePagerToken + "&"
 	}
 
 	data := url.Values{}
-	data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
+//	data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
 	strFilter := AzureImportConf.AzureConf.UserFilter
 	if strFilter != "" {
 		data.Set("$filter", strFilter)
@@ -165,7 +167,8 @@ func queryUsers() (bool, []map[string]interface{}) {
 
 			//fmt.Println(blubber["userPrincipalName"])
 			//bln, manager := getManager(fmt.Sprintf("%s",blubber["userPrincipalName"]))
-			bln, manager := getManager(blubber["userPrincipalName"].(string))
+			//###bln, manager := getManager(blubber["userPrincipalName"].(string))
+			bln, manager := getManager(blubber["id"].(string))
 			if bln {
 				//fmt.Println(manager)
 				blubber["manager"] = manager
@@ -204,8 +207,11 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 		return false, ArrUserMaps
 	}
 
-	strTenant := AzureImportConf.AzureConf.Tenant
-	strURL := "https://graph.windows.net/" + strTenant + "/groups/" + groupID + "/$links/members?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+	//strTenant := AzureImportConf.AzureConf.Tenant
+	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/groups/" + groupID + "/$links/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+	//strURL := "https://graph.microsoft.com/" + AzureImportConf.AzureConf.APIVersion + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+	strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
 	if strAzurePagerToken != "" {
 		strURL += "&$skiptoken=" + strAzurePagerToken
 	}
@@ -262,14 +268,16 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 	//Build map full of users
 	intUserCount := 0
 	q := f.(map[string]interface{})
+	
 	if aResults, ok := q["value"].([]interface{}); ok {
 		//Return the API URL for each user record found in the group
 		for _, userDetails := range aResults {
 			userURL, ok := userDetails.(map[string]interface{})
 			if ok {
 				//Now go get user details and add to map
-				if strUserURL, urlOK := userURL["url"].(string); urlOK {
-					if strings.Contains(strUserURL, "Microsoft.DirectoryServices.User") {
+
+				if strUserURL, urlOK := userURL["@odata.type"].(string); urlOK {
+					if strings.Contains(strUserURL, "microsoft.graph.user") {
 
 						strCurrBearerToken, err := getBearerToken()
 						if err != nil || strCurrBearerToken == "" {
@@ -278,7 +286,10 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 						}
 
 						intUserCount++
-						strUserURL += "?api-version=" + AzureImportConf.AzureConf.APIVersion
+						// strUserURL += "?api-version=" + AzureImportConf.AzureConf.APIVersion
+						//strUserURL = "https://graph.microsoft.com/" + AzureImportConf.AzureConf.APIVersion + "/users/" + userURL["id"].(string)
+						strUserURL = apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users/" + userURL["id"].(string)
+
 						logger(1, "[AZURE] User API URL: "+strUserURL, false)
 						req, err := http.NewRequest("GET", strUserURL, nil)
 						req.Header.Set("Content-Type", "application/json")
@@ -371,14 +382,19 @@ func getManager(userPrincipalName string) (bool, string) {
 		return false, ""
 	}
 
-	strTenant := AzureImportConf.AzureConf.Tenant
-	strURL := "https://graph.windows.net/" + strTenant + "/users/" + userPrincipalName + "/$links/manager?" //$top=1&"
+	//strTenant := AzureImportConf.AzureConf.Tenant
+	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users/" + userPrincipalName + "/$links/manager?" //$top=1&"
+	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users/" + userPrincipalName + "/manager?" //$top=1&"
+	//fmt.Println(strTenant)
+	//strURL := "https://graph.microsoft.com/" + AzureImportConf.AzureConf.APIVersion + "/users/" + userPrincipalName + "/manager" //?" //$top=1&"
+	strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users/" + userPrincipalName + "/manager" //?" //$top=1&"
+	//strURL := "https://graph.microsoft.com/v1.0/me/manager" //?" //$top=1&"
 
 	//fmt.Println(strURL)
 	//strURL := strUserURL + "/$links/manager?" //$top=1&"
 
 	data := url.Values{}
-	data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
+	//data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
 	strData := data.Encode()
 	strURL += strData
 	logger(1, "[AZURE] API URL: "+strURL, false)
@@ -423,7 +439,8 @@ func getManager(userPrincipalName string) (bool, string) {
 		logger(4, " [Azure] Cannot read the body of the response", true)
 		return false, ""
 	}
-
+//fmt.Println(fmt.Sprintf("%v", body))
+//fmt.Println(string(body))
 	var f interface{}
 	qerr := json.Unmarshal(body, &f)
 	if qerr != nil {
@@ -432,82 +449,14 @@ func getManager(userPrincipalName string) (bool, string) {
 	}
 	//fmt.Println(f.url)
 	//Build map of users
-	intUserCount := 0
 
 	q := f.(map[string]interface{})
-
-	if strUserURL, urlOK := q["url"].(string); urlOK {
-		if strings.Contains(strUserURL, "Microsoft.DirectoryServices.User") {
-
-			strCurrBearerToken, err := getBearerToken()
-			if err != nil || strCurrBearerToken == "" {
-				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
-				return false, ""
-			}
-
-			intUserCount++
-			strUserURL += "?api-version=" + AzureImportConf.AzureConf.APIVersion
-			logger(1, "[AZURE] User API URL: "+strUserURL, false)
-			req, err := http.NewRequest("GET", strUserURL, nil)
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("User-Agent", "Go-http-client/1.1")
-			req.Header.Set("Authorization", "Bearer "+strCurrBearerToken)
-			req.Header.Set("Accept", "application/json")
-			duration := time.Second * time.Duration(30)
-
-			clientUser := &http.Client{Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-			}, Timeout: duration}
-			respUser, err := clientUser.Do(req)
-			if err != nil {
-				logger(4, " [Azure] Connection Error: "+fmt.Sprintf("%v", err), true)
-				return false, ""
-			}
-			defer respUser.Body.Close()
-			//-- Check for HTTP Response
-			if respUser.StatusCode != 200 {
-				errorString := fmt.Sprintf("Invalid HTTP Response: %d", resp.StatusCode)
-				err = errors.New(errorString)
-				//Drain the body so we can reuse the connection
-				bodyBytes, _ := ioutil.ReadAll(respUser.Body)
-				bodyString := string(bodyBytes)
-				io.Copy(ioutil.Discard, respUser.Body)
-				logger(4, " [Azure] Error: "+fmt.Sprintf("%v", err), true)
-				logger(4, " [Azure] Response: "+bodyString, true)
-				return false, ""
-			}
-			logger(2, "[Azure] Connection Successful", false)
-
-			userBody, err := ioutil.ReadAll(respUser.Body)
-			if err != nil {
-				logger(4, " [Azure] Cannot read the body of the response", true)
-				return false, ""
-			}
-
-			var fuser interface{}
-			qerror := json.Unmarshal(userBody, &fuser)
-			if qerror != nil {
-				logger(4, " [Azure] Cannot read the JSON", true)
-				return false, ""
-			}
-			blubber := fuser.(map[string]interface{})
-			return true, blubber[AzureImportConf.AzureConf.UserID].(string)
-			//return true, blubber["userPrincipalName"].(string)
-			//ArrUserMaps = append(ArrUserMaps, blubber)
+strUserURL := ""
+	if strUserURL, urlOK := q[AzureImportConf.AzureConf.UserID].(string); urlOK {
+		if strUserURL != "" {
+			return true, strUserURL
 		}
 	}
-
-	/*
-	   	if aResults, ok := q["value"].([]interface{}); ok {
-
-	   		for _, userDetails := range aResults {
-	   			intUserCount++
-
-	   			blubber := userDetails.(map[string]interface{})
-	   	fmt.Println(blubber)
-	   //			ArrUserMaps = append(ArrUserMaps, blubber)
-	   		}
-	   	}
-	*/logger(2, fmt.Sprintf("[Azure] Found %d results", intUserCount), false)
+	logger(2, fmt.Sprintf("[Azure] Found %s results", strUserURL), false)
 	return true, ""
 }

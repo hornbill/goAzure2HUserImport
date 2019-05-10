@@ -1,3 +1,9 @@
+## 2.0.0 (10th May, 2019)
+
+Features:
+
+- now using Microsoft Graph API (as opposed to Azure AD Graph API)
+
 ## 1.4.4 (8th May, 2019)
 
 Fixes:

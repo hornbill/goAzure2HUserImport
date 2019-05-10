@@ -10,7 +10,7 @@
         "UserFilter": "startswith(displayName,'Dave')",
         "UserID": "userPrincipalName",
         "Debug": false,
-        "APIVersion":"1.6",
+        "APIVersion":"v1.0",
         "Search":"groups",
         "UsersByGroupID":[
             {

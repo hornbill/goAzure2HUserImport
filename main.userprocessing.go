@@ -238,11 +238,12 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 				return
 			}
 
-			strTenant := AzureImportConf.AzureConf.Tenant
-			strURL := "https://graph.windows.net/" + strTenant + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
+			//strTenant := AzureImportConf.AzureConf.Tenant
+			//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
+			strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
 
 			data := url.Values{}
-			data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
+			//data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
 			strData := data.Encode()
 			strURL += strData
 			req, err := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))

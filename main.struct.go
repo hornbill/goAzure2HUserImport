@@ -7,10 +7,11 @@ import (
 
 const (
 	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	version      = "1.4.4"
+	version      = "2.0.0"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"
+	apiResource = "https://graph.microsoft.com"
 )
 
 var (
