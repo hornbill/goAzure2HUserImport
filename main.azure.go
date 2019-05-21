@@ -177,7 +177,7 @@ func queryUsers() (bool, []map[string]interface{}) {
 			ArrUserMaps = append(ArrUserMaps, blubber)
 		}
 	}
-	if strNextLink, ok := q["odata.nextLink"]; ok {
+	if strNextLink, ok := q["@odata.nextLink"]; ok {
 		//strAzurePagerToken = strNextLink.(string)
 		//re := regexp.MustCompile("skiptoken=(.*)&?")
 		//strNewPagerToken := re.FindString(strAzurePagerToken)
@@ -349,8 +349,8 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 			}
 		}
 	}
-
-	if strNextLink, ok := q["odata.nextLink"]; ok {
+	
+	if strNextLink, ok := q["@odata.nextLink"]; ok {
 		//strAzurePagerToken = strNextLink.(string)
 		//re := regexp.MustCompile("skiptoken=(.*)&?")
 		//strNewPagerToken := re.FindString(strAzurePagerToken)

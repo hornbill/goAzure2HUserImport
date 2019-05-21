@@ -1,3 +1,9 @@
+## 2.0.1 (21st May, 2019)
+
+Fixes:
+
+- Fix to paging
+
 ## 2.0.0 (10th May, 2019)
 
 Features:
