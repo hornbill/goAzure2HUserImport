@@ -211,7 +211,7 @@ func queryGroup(groupID string) (bool, []map[string]interface{}) {
 	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/groups/" + groupID + "/$links/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
 	//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
 	//strURL := "https://graph.microsoft.com/" + AzureImportConf.AzureConf.APIVersion + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
-	strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/groups/" + groupID + "/members" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
+	strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/groups/" + groupID + "/members?" //?api-version=" + AzureImportConf.AzureConf.APIVersion // + "&$top=2"
 	if strAzurePagerToken != "" {
 		strURL += "&$skiptoken=" + strAzurePagerToken
 	}
