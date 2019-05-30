@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 )
 
 //-- Worker Pool Function
-func loggerGen(t int, s string) string {
-
+func loggerGen(t int, s string, includeTime bool) string {
+	var errorString = ""
 	var errorLogPrefix = ""
 	//-- Create Log Entry
 	switch t {
@@ -25,14 +25,15 @@ func loggerGen(t int, s string) string {
 		errorLogPrefix = "[WARN] "
 	case 4:
 		errorLogPrefix = "[ERROR] "
+	case 5:
+		errorLogPrefix = ""
 	}
-	currentTime := time.Now().UTC()
-	time := currentTime.Format("2006/01/02 15:04:05")
-	return time + " " + errorLogPrefix + s + "\n"
-}
-
-func loggerWriteBuffer(s string) {
-	logger(0, s, false)
+	if includeTime {
+		currentTime := time.Now().UTC()
+		errorString = currentTime.Format("2006/01/02 15:04:05") + " "
+	}
+	errorString += errorLogPrefix + s + "\n"
+	return errorString
 }
 
 //-- Logging function
@@ -97,9 +98,7 @@ func logger(t int, s string, outputtoCLI bool) {
 }
 
 //-- Log to ESP
-func espLogger(message string, severity string) bool {
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
+func espLogger(message, severity string, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	espXmlmc.SetParam("fileName", "Azure_User_Import")
 	espXmlmc.SetParam("group", "general")
 	espXmlmc.SetParam("severity", severity)

@@ -6,83 +6,70 @@ import (
 )
 
 const (
-	letterBytes  = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	version      = "2.0.0"
+	version      = "2.1.0"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"
-	apiResource = "https://graph.microsoft.com"
+	apiResource  = "https://graph.microsoft.com"
 )
+
+//Password profiles
+var passwordProfile passwordProfileStruct
+var blacklistURLs = [...]string{"https://files.hornbill.com/hornbillStatic/password_blacklists/SplashData.txt", "https://files.hornbill.com/hornbillStatic/password_blacklists/Imperva.txt"}
+var defaultPasswordLength = 10
+
+type passwordProfileStruct struct {
+	Length              int
+	UseLower            bool
+	ForceLower          int
+	UseUpper            bool
+	ForceUpper          int
+	UseNumeric          bool
+	ForceNumeric        int
+	UseSpecial          bool
+	ForceSpecial        int
+	Blacklist           []string
+	CheckMustNotContain bool
+}
+
+type xmlmcSettingResponse struct {
+	Params struct {
+		Option []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"option"`
+	} `json:"params"`
+	State stateStruct `json:"state"`
+}
 
 var (
 	//AzureImportConf - Holds the import configuration from the JSON file
-	AzureImportConf     AzureImportConfStruct
-	xmlmcInstanceConfig xmlmcConfig
-	xmlmcUsers          []userListItemStruct
-	sites               []siteListStruct
-	managers            []managerListStruct
-	groups              []groupListStruct
-	counters            counterTypeStruct
-	configFileName      string
-	configZone          string
-	configLogPrefix     string
-	configDryRun        bool
-	configVersion       bool
-	configWorkers       int
-	configMaxRoutines   string
-	timeNow             string
-	strAzurePagerToken  = ""
-	startTime           time.Time
-	endTime             time.Duration
-	errorCount          uint64
-	noValuesToUpdate    = "There are no values to update"
-	mutex               = &sync.Mutex{}
-	mutexBar            = &sync.Mutex{}
-	mutexCounters       = &sync.Mutex{}
-	mutexCustomers      = &sync.Mutex{}
-	mutexSite           = &sync.Mutex{}
-	mutexSites          = &sync.Mutex{}
-	mutexGroups         = &sync.Mutex{}
-	mutexManagers       = &sync.Mutex{}
-	logFileMutex        = &sync.Mutex{}
-	bufferMutex         = &sync.Mutex{}
-	worker              sync.WaitGroup
-	maxGoroutines       = 6
-	globalBearerToken   = ""
-	globalTokenExpiry   int64
-
-	userProfileMappingMap = map[string]string{
-		"MiddleName":        "middleName",
-		"JobDescription":    "jobDescription",
-		"Manager":           "manager",
-		"WorkPhone":         "workPhone",
-		"Qualifications":    "qualifications",
-		"Interests":         "interests",
-		"Expertise":         "expertise",
-		"Gender":            "gender",
-		"Dob":               "dob",
-		"Nationality":       "nationality",
-		"Religion":          "religion",
-		"HomeTelephone":     "homeTelephone",
-		"SocialNetworkA":    "socialNetworkA",
-		"SocialNetworkB":    "socialNetworkB",
-		"SocialNetworkC":    "socialNetworkC",
-		"SocialNetworkD":    "socialNetworkD",
-		"SocialNetworkE":    "socialNetworkE",
-		"SocialNetworkF":    "socialNetworkF",
-		"SocialNetworkG":    "socialNetworkG",
-		"SocialNetworkH":    "socialNetworkH",
-		"PersonalInterests": "personalInterests",
-		"HomeAddress":       "homeAddress",
-		"PersonalBlog":      "personalBlog",
-		"Attrib1":           "attrib1",
-		"Attrib2":           "attrib2",
-		"Attrib3":           "attrib3",
-		"Attrib4":           "attrib4",
-		"Attrib5":           "attrib5",
-		"Attrib6":           "attrib6",
-		"Attrib7":           "attrib7",
-		"Attrib8":           "attrib8"}
+	AzureImportConf    AzureImportConfStruct
+	sites              []siteListStruct
+	managers           []managerListStruct
+	groups             []groupListStruct
+	counters           counterTypeStruct
+	configFileName     string
+	configZone         string
+	configLogPrefix    string
+	configDryRun       bool
+	configVersion      bool
+	configMaxRoutines  int
+	timeNow            string
+	strAzurePagerToken = ""
+	startTime          time.Time
+	endTime            time.Duration
+	errorCount         uint64
+	noValuesToUpdate   = "There are no values to update"
+	mutexBar           = &sync.Mutex{}
+	mutexCounters      = &sync.Mutex{}
+	mutexSites         = &sync.Mutex{}
+	mutexGroups        = &sync.Mutex{}
+	mutexManagers      = &sync.Mutex{}
+	logFileMutex       = &sync.Mutex{}
+	worker             sync.WaitGroup
+	globalBearerToken  = ""
+	globalTokenExpiry  int64
 
 	userProfileArray = []string{
 		"MiddleName",
@@ -116,26 +103,6 @@ var (
 		"Attrib6",
 		"Attrib7",
 		"Attrib8"}
-
-	userMappingMap = map[string]string{
-		"Name":           "name",
-		"Password":       "password",
-		"UserType":       "userType",
-		"FirstName":      "firstName",
-		"LastName":       "lastName",
-		"JobTitle":       "jobTitle",
-		"Site":           "site",
-		"Phone":          "phone",
-		"Email":          "email",
-		"Mobile":         "mobile",
-		"AbsenceMessage": "absenceMessage",
-		"TimeZone":       "timeZone",
-		"Language":       "language",
-		"DateTimeFormat": "dateTimeFormat",
-		"DateFormat":     "dateFormat",
-		"TimeFormat":     "timeFormat",
-		"CurrencySymbol": "currencySymbol",
-		"CountryCode":    "countryCode"}
 
 	userUpdateArray = []string{
 		"userId",
@@ -210,12 +177,6 @@ type groupListStruct struct {
 	GroupID   string
 }
 
-type xmlmcConfig struct {
-	instance string
-	zone     string
-	url      string
-}
-
 type counterTypeStruct struct {
 	updated        uint16
 	created        uint16
@@ -224,65 +185,13 @@ type counterTypeStruct struct {
 	createskipped  uint16
 	profileSkipped uint16
 }
-type userMappingStruct struct {
-	UserID         string
-	UserType       string
-	Name           string
-	Password       string
-	FirstName      string
-	LastName       string
-	JobTitle       string
-	Site           string
-	Phone          string
-	Email          string
-	Mobile         string
-	AbsenceMessage string
-	TimeZone       string
-	Language       string
-	DateTimeFormat string
-	DateFormat     string
-	TimeFormat     string
-	CurrencySymbol string
-	CountryCode    string
-}
+
 type userAccountStatusStruct struct {
 	Action  string
 	Enabled bool
 	Status  string
 }
-type userProfileMappingStruct struct {
-	MiddleName        string
-	JobDescription    string
-	Manager           string
-	WorkPhone         string
-	Qualifications    string
-	Interests         string
-	Expertise         string
-	Gender            string
-	Dob               string
-	Nationality       string
-	Religion          string
-	HomeTelephone     string
-	SocialNetworkA    string
-	SocialNetworkB    string
-	SocialNetworkC    string
-	SocialNetworkD    string
-	SocialNetworkE    string
-	SocialNetworkF    string
-	SocialNetworkG    string
-	SocialNetworkH    string
-	PersonalInterests string
-	HomeAddress       string
-	PersonalBlog      string
-	Attrib1           string
-	Attrib2           string
-	Attrib3           string
-	Attrib4           string
-	Attrib5           string
-	Attrib6           string
-	Attrib7           string
-	Attrib8           string
-}
+
 type userManagerStruct struct {
 	Action  string
 	Enabled bool
@@ -319,7 +228,6 @@ type OrgUnitStruct struct {
 type AzureImportConfStruct struct {
 	APIKey             string
 	InstanceID         string
-	URL                string
 	DAVURL             string
 	UpdateUserType     bool
 	UserRoleAction     string
@@ -370,19 +278,13 @@ type paramsCheckUsersStruct struct {
 type paramsStruct struct {
 	SessionID string `xml:"sessionId"`
 }
-type paramsUserListStruct struct {
-	UserListItem []userListItemStruct `xml:"userListItem"`
-}
-type userListItemStruct struct {
-	UserID string `xml:"userId"`
-	Name   string `xml:"name"`
-}
 
 type azureConfStruct struct {
 	Tenant         string
 	ClientID       string
 	ClientSecret   string
 	UserFilter     string
+	UserProperties []string
 	UserID         string
 	Debug          bool
 	APIVersion     string

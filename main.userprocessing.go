@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
@@ -18,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/hornbill/goApiLib"
+	apiLib "github.com/hornbill/goApiLib"
 	"github.com/hornbill/pb"
 )
 
@@ -28,11 +27,13 @@ import (
 func processUsers(arrUsers []map[string]interface{}) {
 	bar := pb.StartNew(len(arrUsers))
 	logger(1, "Processing Users", false)
+	logger(0, "", false)
 
 	//Get the identity of the UserID field from the config
 	userIDField := fmt.Sprintf("%v", AzureImportConf.AzureConf.UserID)
+
 	//-- Loop each user
-	maxGoroutinesGuard := make(chan struct{}, maxGoroutines)
+	maxGoroutinesGuard := make(chan struct{}, configMaxRoutines)
 
 	for _, customerRecord := range arrUsers {
 		maxGoroutinesGuard <- struct{}{}
@@ -40,14 +41,12 @@ func processUsers(arrUsers []map[string]interface{}) {
 		userMap := customerRecord
 		//Get the user ID for the current record
 		userID := fmt.Sprintf("%v", userMap[userIDField])
-		logger(1, "User ID: "+userID, false)
 		if userID != "" {
-			//logger(1, "User ID: "+fmt.Sprintf("%v", userID), false)
-			espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
+			espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.InstanceID)
 			espXmlmc.SetAPIKey(AzureImportConf.APIKey)
 			go func() {
 				defer worker.Done()
-				time.Sleep(1 * time.Millisecond)
+
 				mutexBar.Lock()
 				bar.Increment()
 				mutexBar.Unlock()
@@ -62,17 +61,9 @@ func processUsers(arrUsers []map[string]interface{}) {
 				//-- Update or Create User
 				if !isErr {
 					if boolUpdate {
-						logger(1, "Update Customer: "+userID, false)
-						_, errUpdate := updateUser(userMap, espXmlmc)
-						if errUpdate != nil {
-							logger(4, "Unable to Update User: "+fmt.Sprintf("%v", errUpdate), false)
-						}
+						updateUser(userMap, espXmlmc)
 					} else {
-						logger(1, "Create Customer: "+userID, false)
-						_, errorCreate := createUser(userMap, espXmlmc)
-						if errorCreate != nil {
-							logger(4, "Unable to Create User: "+fmt.Sprintf("%v", errorCreate), false)
-						}
+						createUser(userMap, espXmlmc)
 					}
 				}
 				<-maxGoroutinesGuard
@@ -83,18 +74,135 @@ func processUsers(arrUsers []map[string]interface{}) {
 	bar.FinishPrint("Processing Complete!")
 }
 
-func updateUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) (bool, error) {
+func createUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
 	buf2 := bytes.NewBufferString("")
-	//-- Do we Lookup Site
-	var p map[string]string
-	p = make(map[string]string)
+	p := make(map[string]string)
+	for key, value := range u {
+		p[key] = fmt.Sprintf("%v", value)
+	}
+
+	userID := p[AzureImportConf.AzureConf.UserID]
+	userFirstName := p["givenName"]
+	userLastName := p["surname"]
+
+	buf2.WriteString(loggerGen(1, "Create User: "+userID, false))
+	for key := range userCreateArray {
+		field := userCreateArray[key]
+		value := AzureImportConf.UserMapping[field]
+
+		t := template.New(field)
+		t, _ = t.Parse(value)
+		buf := bytes.NewBufferString("")
+		t.Execute(buf, p)
+		value = buf.String()
+		if value == "%!s(<nil>)" {
+			value = ""
+		}
+
+		//-- Process Site
+		if field == "Site" {
+			//-- Only use Site lookup if enabled and not set to Update only
+			if AzureImportConf.SiteLookup.Enabled && AzureImportConf.OrgLookup.Action != updateString {
+				value = getSiteFromLookup(value, buf2)
+			}
+		}
+		//-- Process Password Field
+		if field == "Password" {
+			if value == "" {
+				userArr := []string{userID, userFirstName, userLastName}
+				value = generatePasswordString(userID, userArr)
+				if value != "" {
+					buf2.WriteString(loggerGen(1, "Auto Generated Password for: "+userID+" - "+value, true))
+				}
+			}
+			value = base64.StdEncoding.EncodeToString([]byte(value))
+		}
+
+		//-- if we have Value then set it
+		if value != "" && value != "<nil>" && value != "&lt;nil&gt;" {
+			espXmlmc.SetParam(field, value)
+
+		}
+	}
+
+	//-- Check for Dry Run
+	if !configDryRun {
+
+		XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userCreate")
+		var xmlRespon xmlmcResponse
+		if xmlmcErr != nil {
+			buf2.WriteString(loggerGen(4, "Error calling userCreate API: "+fmt.Sprintf("%v", xmlmcErr), true))
+			errorCountInc()
+			logger(0, buf2.String(), false)
+			return
+		}
+		err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
+		if err != nil {
+			buf2.WriteString(loggerGen(4, "Error unmarshalling userCreate response: "+fmt.Sprintf("%v", err), true))
+			errorCountInc()
+			logger(0, buf2.String(), false)
+			return
+		}
+		if xmlRespon.MethodResult != constOK {
+			buf2.WriteString(loggerGen(4, "Error returned from userCreate: "+xmlRespon.State.ErrorRet, true))
+			errorCountInc()
+			logger(0, buf2.String(), false)
+			return
+
+		}
+		buf2.WriteString(loggerGen(1, "User Create Success", true))
+
+		//-- Only use Org lookup if enabled and not set to Update only
+		if AzureImportConf.OrgLookup.Enabled && AzureImportConf.OrgLookup.Action != updateString && len(AzureImportConf.OrgLookup.OrgUnits) > 0 {
+			userAddGroups(p, buf2, espXmlmc)
+		}
+		//-- Process Account Status
+		if AzureImportConf.UserAccountStatus.Enabled && AzureImportConf.UserAccountStatus.Action != updateString {
+			userSetStatus(userID, AzureImportConf.UserAccountStatus.Status, buf2, espXmlmc)
+		}
+
+		if AzureImportConf.UserRoleAction != updateString && len(AzureImportConf.Roles) > 0 {
+			userAddRoles(userID, buf2, espXmlmc)
+		}
+
+		//-- Add Image
+		if AzureImportConf.ImageLink.Enabled && AzureImportConf.ImageLink.Action != updateString && AzureImportConf.ImageLink.URI != "" {
+			userAddImage(p, buf2, espXmlmc)
+		}
+
+		//-- Process Profile Details
+		boolUpdateProfile := userUpdateProfile(p, buf2, espXmlmc)
+		if !boolUpdateProfile {
+			errorCountInc()
+			logger(0, buf2.String(), false)
+			return
+		}
+
+		createCountInc()
+		logger(0, buf2.String(), false)
+		return
+	}
+
+	//-- DEBUG XML TO LOG FILE
+	var XMLSTRING = espXmlmc.GetParam()
+	buf2.WriteString(loggerGen(4, "User Create XML "+fmt.Sprintf("%v", XMLSTRING), true))
+	createSkippedCountInc()
+	espXmlmc.ClearParam()
+	logger(0, buf2.String(), false)
+	return
+}
+
+func updateUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
+	buf2 := bytes.NewBufferString("")
+	p := make(map[string]string)
 	for key, value := range u {
 		p[key] = fmt.Sprintf("%v", value)
 	}
 	userID := p[AzureImportConf.AzureConf.UserID]
+	buf2.WriteString(loggerGen(1, "Update User: "+userID, true))
 	for key := range userUpdateArray {
 		field := userUpdateArray[key]
-		value := AzureImportConf.UserMapping[field] //userMappingMap[name]
+		value := AzureImportConf.UserMapping[field]
 
 		t := template.New(field)
 		t, _ = t.Parse(value)
@@ -129,30 +237,35 @@ func updateUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) (boo
 	}
 
 	//-- Check for Dry Run
-	if configDryRun != true {
+	if !configDryRun {
 		XMLUpdate, xmlmcErr := espXmlmc.Invoke("admin", "userUpdate")
 		var xmlRespon xmlmcResponse
 		if xmlmcErr != nil {
-			return false, xmlmcErr
+			buf2.WriteString(loggerGen(4, "Error calling userUpdate API: "+fmt.Sprintf("%v", xmlmcErr), true))
+			logger(0, buf2.String(), false)
+			return
 		}
 		err := xml.Unmarshal([]byte(XMLUpdate), &xmlRespon)
 		if err != nil {
-			return false, err
+			buf2.WriteString(loggerGen(4, "Error unmarshalling userUpdate API response: "+fmt.Sprintf("%v", err), true))
+			logger(0, buf2.String(), false)
+			return
 		}
 
 		if xmlRespon.MethodResult != constOK && xmlRespon.State.ErrorRet != noValuesToUpdate {
-			err = errors.New(xmlRespon.State.ErrorRet)
+			buf2.WriteString(loggerGen(4, "Error returned from userUpdate API: "+xmlRespon.State.ErrorRet, true))
 			errorCountInc()
-			return false, err
+			logger(0, buf2.String(), false)
+			return
 
 		}
 		//-- Only use Org lookup if enabled and not set to create only
 		if AzureImportConf.OrgLookup.Enabled && AzureImportConf.OrgLookup.Action != createString && len(AzureImportConf.OrgLookup.OrgUnits) > 0 {
-			userAddGroups(p, buf2)
+			userAddGroups(p, buf2, espXmlmc)
 		}
 		//-- Process User Status
 		if AzureImportConf.UserAccountStatus.Enabled && AzureImportConf.UserAccountStatus.Action != createString {
-			userSetStatus(userID, AzureImportConf.UserAccountStatus.Status, buf2)
+			userSetStatus(userID, AzureImportConf.UserAccountStatus.Status, buf2, espXmlmc)
 		}
 
 		//-- Add Roles
@@ -162,42 +275,42 @@ func updateUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) (boo
 
 		//-- Add Image
 		if AzureImportConf.ImageLink.Enabled && AzureImportConf.ImageLink.Action != createString && AzureImportConf.ImageLink.URI != "" {
-			userAddImage(p, buf2)
+			userAddImage(p, buf2, espXmlmc)
 		}
 
 		//-- Process Profile Details
 		boolUpdateProfile := userUpdateProfile(p, buf2, espXmlmc)
-		if boolUpdateProfile != true {
-			err = errors.New("User Profile Issue (u): " + buf2.String())
+		if !boolUpdateProfile {
 			errorCountInc()
-			return false, err
+			logger(0, buf2.String(), false)
+			return
 		}
 		if xmlRespon.State.ErrorRet != noValuesToUpdate {
-			buf2.WriteString(loggerGen(1, "User Update Success"))
+			buf2.WriteString(loggerGen(1, "User Update Success", true))
 			updateCountInc()
 		} else {
 			updateSkippedCountInc()
 		}
-		logger(1, buf2.String(), false)
-		return true, nil
+		logger(0, buf2.String(), false)
+		return
 	}
 	//-- Inc Counter
 	updateSkippedCountInc()
 	//-- DEBUG XML TO LOG FILE
 	var XMLSTRING = espXmlmc.GetParam()
-	logger(1, "User Update XML "+fmt.Sprintf("%v", XMLSTRING), false)
+	buf2.WriteString(loggerGen(1, "User Update XML "+fmt.Sprintf("%v", XMLSTRING), true))
 	espXmlmc.ClearParam()
-
-	return true, nil
+	logger(0, buf2.String(), false)
+	return
 }
 
-func userAddGroups(p map[string]string, buffer *bytes.Buffer) bool {
+func userAddGroups(p map[string]string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	for _, orgUnit := range AzureImportConf.OrgLookup.OrgUnits {
-		userAddGroup(p, buffer, orgUnit)
+		userAddGroup(p, buffer, orgUnit, espXmlmc)
 	}
 	return true
 }
-func userAddImage(p map[string]string, buffer *bytes.Buffer) {
+func userAddImage(p map[string]string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcInstStruct) {
 	UserID := p[AzureImportConf.AzureConf.UserID]
 
 	t := template.New("i" + UserID)
@@ -208,12 +321,15 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 	if value == "%!s(<nil>)" {
 		value = ""
 	}
-	buffer.WriteString(loggerGen(2, "Image for user: "+value))
+	buffer.WriteString(loggerGen(2, "Image for user: "+value, true))
 	if value == "" {
 		return
 	}
 
 	strContentType := "image/jpeg"
+
+	relLink := "session/" + UserID
+	strDAVurl := AzureImportConf.DAVURL + relLink
 
 	if strings.ToUpper(AzureImportConf.ImageLink.UploadType) != "URI" {
 		// get binary to upload via WEBDAV and then set value to relative "session" URI
@@ -224,9 +340,6 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 			Timeout: time.Duration(10 * time.Second),
 		}
 
-		relLink := "session/" + UserID
-		strDAVurl := AzureImportConf.DAVURL + relLink
-
 		var imageB []byte
 		var Berr error
 		switch strings.ToUpper(AzureImportConf.ImageLink.UploadType) {
@@ -234,19 +347,16 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 
 			strBearerToken, err := getBearerToken()
 			if err != nil || strBearerToken == "" {
-				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
+				buffer.WriteString(loggerGen(4, "[Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true))
 				return
 			}
 
-			//strTenant := AzureImportConf.AzureConf.Tenant
-			//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
 			strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
 
 			data := url.Values{}
-			//data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
 			strData := data.Encode()
 			strURL += strData
-			req, err := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))
+			req, _ := http.NewRequest("GET", strURL, nil)
 			req.Header.Set("User-Agent", "Go-http-client/1.1")
 			req.Header.Set("Authorization", "Bearer "+strBearerToken)
 			duration := time.Second * time.Duration(30)
@@ -255,7 +365,7 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 			}, Timeout: duration}
 			resp, err := imgclient.Do(req)
 			if err != nil {
-				logger(4, " [Image] Connection Error: "+fmt.Sprintf("%v", err), false)
+				buffer.WriteString(loggerGen(4, " [IMAGE] Connection Error: "+fmt.Sprintf("%v", err), true))
 				return
 			}
 			defer resp.Body.Close()
@@ -264,20 +374,19 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 			if resp.StatusCode != 200 {
 				if resp.StatusCode != 404 {
 					errorString := fmt.Sprintf("Invalid HTTP Response: %d", resp.StatusCode)
-					err = errors.New(errorString)
-					logger(4, " [Image] Error: "+fmt.Sprintf("%v", err), false)
+					buffer.WriteString(loggerGen(4, " [IMAGE] Error: "+errorString, true))
 				} else {
-					logger(4, " [Image] Not Found", false)
+					buffer.WriteString(loggerGen(4, " [IMAGE] Not Found", true))
 				}
 				//Drain the body so we can reuse the connection
 				io.Copy(ioutil.Discard, resp.Body)
 				return
 			}
-			logger(2, "[Image] Connection Successful", false)
+			buffer.WriteString(loggerGen(2, " [IMAGE] Connection Sucessful", true))
 
 			imageB, err = ioutil.ReadAll(resp.Body)
 			if err != nil {
-				logger(4, " [Image] Cannot read the body of the response", false)
+				buffer.WriteString(loggerGen(4, " [IMAGE] Cannot read the body of the response", true))
 				return
 			}
 			strContentType = resp.Header.Get("Content-Type")
@@ -285,7 +394,7 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 		case "URL":
 			resp, err := http.Get(value)
 			if err != nil {
-				buffer.WriteString(loggerGen(4, "Unable to find "+value+" ["+fmt.Sprintf("%v", http.StatusInternalServerError)+"]"))
+				buffer.WriteString(loggerGen(4, "Unable to find "+value+" ["+fmt.Sprintf("%v", http.StatusInternalServerError)+"]", true))
 				return
 			}
 			defer resp.Body.Close()
@@ -293,14 +402,14 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 				imageB, _ = ioutil.ReadAll(resp.Body)
 
 			} else {
-				buffer.WriteString(loggerGen(4, "Unsuccesful download: "+fmt.Sprintf("%v", resp.StatusCode)))
+				buffer.WriteString(loggerGen(4, "Unsuccesful download: "+fmt.Sprintf("%v", resp.StatusCode), true))
 				return
 			}
 
 		default:
 			imageB, Berr = hex.DecodeString(value[2:]) //stripping leading 0x
 			if Berr != nil {
-				buffer.WriteString(loggerGen(4, "Unsuccesful Decoding "+fmt.Sprintf("%v", Berr)))
+				buffer.WriteString(loggerGen(4, "Unsuccesful Decoding "+fmt.Sprintf("%v", Berr), true))
 				return
 			}
 
@@ -308,60 +417,80 @@ func userAddImage(p map[string]string, buffer *bytes.Buffer) {
 		//WebDAV upload
 		if len(imageB) > 0 {
 			putbody := bytes.NewReader(imageB)
-			req, Perr := http.NewRequest("PUT", strDAVurl, putbody)
+			req, _ := http.NewRequest("PUT", strDAVurl, putbody)
 			req.Header.Set("Content-Type", strContentType)
 			req.Header.Add("Authorization", "ESP-APIKEY "+AzureImportConf.APIKey)
 			req.Header.Set("User-Agent", "Go-http-client/1.1")
 			response, Perr := client.Do(req)
 			if Perr != nil {
-				buffer.WriteString(loggerGen(4, "PUT connection issue: "+fmt.Sprintf("%v", http.StatusInternalServerError)))
+				buffer.WriteString(loggerGen(4, "PUT connection issue: "+fmt.Sprintf("%v", http.StatusInternalServerError), true))
 				return
 			}
 			defer response.Body.Close()
 			_, _ = io.Copy(ioutil.Discard, response.Body)
 			if response.StatusCode == 201 || response.StatusCode == 200 {
-				buffer.WriteString(loggerGen(1, "Uploaded"))
+				buffer.WriteString(loggerGen(1, "Uploaded", true))
 				value = "/" + relLink
 			} else {
-				buffer.WriteString(loggerGen(4, "Unsuccesful Upload: "+fmt.Sprintf("%v", response.StatusCode)))
+				buffer.WriteString(loggerGen(4, "Unsuccesful Upload: "+fmt.Sprintf("%v", response.StatusCode), true))
 				return
 			}
 		} else {
-			buffer.WriteString(loggerGen(4, "No Image to upload"))
+			buffer.WriteString(loggerGen(4, "No Image to upload", true))
 			return
 		}
 	}
 
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
 	espXmlmc.SetParam("objectRef", "urn:sys:user:"+UserID)
 	espXmlmc.SetParam("sourceImage", value)
 
 	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("activity", "profileImageSet")
 	var xmlRespon xmlmcprofileSetImageResponse
 	if xmlmcErr != nil {
-		log.Fatal(xmlmcErr)
-		buffer.WriteString(loggerGen(4, "Unable to associate Image to User Profile: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to associate Image to User Profile: "+fmt.Sprintf("%v", xmlmcErr), true))
 	}
 	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Associate Image to User Profile: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Associate Image to User Profile: "+fmt.Sprintf("%v", err), true))
 	} else {
 		if xmlRespon.MethodResult != constOK {
-			buffer.WriteString(loggerGen(4, "Unable to Associate Image to User Profile: "+xmlRespon.State.ErrorRet))
+			buffer.WriteString(loggerGen(4, "Unable to Associate Image to User Profile: "+xmlRespon.State.ErrorRet, true))
 		} else {
-			buffer.WriteString(loggerGen(1, "Image added to User: "+UserID))
+			buffer.WriteString(loggerGen(1, "Image added to User: "+UserID, true))
 		}
 	}
-}
-func userAddGroup(p map[string]string, buffer *bytes.Buffer, orgUnit OrgUnitStruct) bool {
 
-	//-- Check if Site Attribute is set
+	//Now go delete the file from dav
+	reqDel, DelErr := http.NewRequest("DELETE", strDAVurl, nil)
+	if DelErr != nil {
+		buffer.WriteString(loggerGen(3, "User image updated but could not remove from session. Error: "+fmt.Sprintf("%v", DelErr), true))
+		return
+	}
+	reqDel.Header.Add("Authorization", "ESP-APIKEY "+AzureImportConf.APIKey)
+	reqDel.Header.Set("User-Agent", "Go-http-client/1.1")
+
+	duration := time.Second * time.Duration(60)
+	client := &http.Client{Timeout: duration}
+
+	responseDel, DelErr := client.Do(reqDel)
+	if DelErr != nil {
+		buffer.WriteString(loggerGen(3, "User image updated but could not remove from session. Error: "+fmt.Sprintf("%v", DelErr), true))
+		return
+	}
+	defer responseDel.Body.Close()
+	_, _ = io.Copy(ioutil.Discard, responseDel.Body)
+	if responseDel.StatusCode < 200 || responseDel.StatusCode > 299 {
+		buffer.WriteString(loggerGen(3, "User image updated but could not remove from session. Status Code: "+strconv.Itoa(responseDel.StatusCode), true))
+		return
+	}
+	buffer.WriteString(loggerGen(1, "User image removes from session successfully.", true))
+}
+
+func userAddGroup(p map[string]string, buffer *bytes.Buffer, orgUnit OrgUnitStruct, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	if orgUnit.Attribute == "" {
-		buffer.WriteString(loggerGen(2, "Org Lookup is Enabled but Attribute is not Defined"))
+		buffer.WriteString(loggerGen(2, "Org Lookup is Enabled but Attribute is not Defined", true))
 		return false
 	}
-	//-- Get Value of Attribute
 	t := template.New("orgunit" + strconv.Itoa(orgUnit.Type))
 	t, _ = t.Parse(orgUnit.Attribute)
 	buf := bytes.NewBufferString("")
@@ -370,36 +499,33 @@ func userAddGroup(p map[string]string, buffer *bytes.Buffer, orgUnit OrgUnitStru
 	if value == "%!s(<nil>)" {
 		value = ""
 	}
-	buffer.WriteString(loggerGen(2, "Azure Attribute for Org Lookup: "+value))
+	buffer.WriteString(loggerGen(2, "Azure Attribute for Org Lookup: "+value, true))
 	if value == "" {
 		return true
 	}
 
 	orgAttributeName := processComplexField(value)
 	orgIsInCache, orgID := groupInCache(strconv.Itoa(orgUnit.Type) + orgAttributeName)
-	//-- Check if we have Chached the site already
 	if orgIsInCache {
-		buffer.WriteString(loggerGen(1, "Found Org in Cache "+orgID))
-		userAddGroupAsoc(p, orgUnit, orgID, buffer)
+		buffer.WriteString(loggerGen(1, "Found Org in Cache "+orgID, true))
+		userAddGroupAsoc(p, orgUnit, orgID, buffer, espXmlmc)
 		return true
 	}
 
 	//-- We Get here if not in cache
-	orgIsOnInstance, orgID := searchGroup(orgAttributeName, orgUnit, buffer)
+	orgIsOnInstance, orgID := searchGroup(orgAttributeName, orgUnit, buffer, espXmlmc)
 	if orgIsOnInstance {
-		buffer.WriteString(loggerGen(1, "Org Lookup found Id "+orgID))
-		userAddGroupAsoc(p, orgUnit, orgID, buffer)
+		buffer.WriteString(loggerGen(1, "Org Lookup found Id "+orgID, true))
+		userAddGroupAsoc(p, orgUnit, orgID, buffer, espXmlmc)
 		return true
 	}
-	buffer.WriteString(loggerGen(1, "Unable to Find Organisation "+orgAttributeName))
+	buffer.WriteString(loggerGen(1, "Unable to Find Organisation "+orgAttributeName, true))
 	return false
 
 }
 
-func userAddGroupAsoc(p map[string]string, orgUnit OrgUnitStruct, orgID string, buffer *bytes.Buffer) {
+func userAddGroupAsoc(p map[string]string, orgUnit OrgUnitStruct, orgID string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcInstStruct) {
 	UserID := p[AzureImportConf.AzureConf.UserID]
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
 	espXmlmc.SetParam("userId", UserID)
 	espXmlmc.SetParam("groupId", orgID)
 	espXmlmc.SetParam("memberRole", orgUnit.Membership)
@@ -412,203 +538,29 @@ func userAddGroupAsoc(p map[string]string, orgUnit OrgUnitStruct, orgID string, 
 	var xmlRespon xmlmcuserSetGroupOptionsResponse
 	if xmlmcErr != nil {
 		log.Fatal(xmlmcErr)
-		buffer.WriteString(loggerGen(4, "Unable to Associate User To Group: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Associate User To Group: "+fmt.Sprintf("%v", xmlmcErr), true))
 	}
 	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Associate User To Group: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Associate User To Group: "+fmt.Sprintf("%v", err), true))
 	} else {
 		if xmlRespon.MethodResult != constOK {
 			if xmlRespon.State.ErrorRet != "The specified user ["+UserID+"] already belongs to ["+orgID+"] group" {
-				buffer.WriteString(loggerGen(4, "Unable to Associate User To Organisation: "+xmlRespon.State.ErrorRet))
+				buffer.WriteString(loggerGen(4, "Unable to Associate User To Organisation: "+xmlRespon.State.ErrorRet, true))
 			} else {
-				buffer.WriteString(loggerGen(1, "User: "+UserID+" Already Added to Organisation: "+orgID))
+				buffer.WriteString(loggerGen(1, "User: "+UserID+" Already Added to Organisation: "+orgID, true))
 			}
 
 		} else {
-			buffer.WriteString(loggerGen(1, "User: "+UserID+" Added to Organisation: "+orgID))
+			buffer.WriteString(loggerGen(1, "User: "+UserID+" Added to Organisation: "+orgID, true))
 		}
 	}
 
-}
-
-//-- Function to Check if in Cache
-func groupInCache(groupName string) (bool, string) {
-	boolReturn := false
-	stringReturn := ""
-	//-- Check if in Cache
-	mutexGroups.Lock()
-	for _, group := range groups {
-		if group.GroupName == groupName {
-			boolReturn = true
-			stringReturn = group.GroupID
-			break
-		}
-	}
-	mutexGroups.Unlock()
-	return boolReturn, stringReturn
-}
-
-//-- Function to Check if site is on the instance
-func searchGroup(orgName string, orgUnit OrgUnitStruct, buffer *bytes.Buffer) (bool, string) {
-	boolReturn := false
-	strReturn := ""
-	//-- ESP Query for site
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
-	if orgName == "" {
-		return boolReturn, strReturn
-	}
-	espXmlmc.SetParam("application", "com.hornbill.core")
-	espXmlmc.SetParam("queryName", "GetGroupByName")
-	espXmlmc.OpenElement("queryParams")
-	espXmlmc.SetParam("h_name", orgName)
-	espXmlmc.SetParam("h_type", strconv.Itoa(orgUnit.Type))
-	espXmlmc.CloseElement("queryParams")
-
-	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "queryExec")
-	var xmlRespon xmlmcGroupListResponse
-	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+fmt.Sprintf("%v", xmlmcErr)))
-	}
-	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
-	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+fmt.Sprintf("%v", err)))
-	} else {
-		if xmlRespon.MethodResult != constOK {
-			buffer.WriteString(loggerGen(4, "Unable to Search for Group: "+xmlRespon.State.ErrorRet))
-		} else {
-			//-- Check Response
-			if xmlRespon.Params.RowData.Row.GroupID != "" {
-				strReturn = xmlRespon.Params.RowData.Row.GroupID
-				boolReturn = true
-				//-- Add Group to Cache
-				mutexGroups.Lock()
-				var newgroupForCache groupListStruct
-				newgroupForCache.GroupID = strReturn
-				newgroupForCache.GroupName = strconv.Itoa(orgUnit.Type) + orgName
-				name := []groupListStruct{newgroupForCache}
-				groups = append(groups, name...)
-				mutexGroups.Unlock()
-			}
-		}
-	}
-
-	return boolReturn, strReturn
-}
-
-func createUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) (bool, error) {
-	buf2 := bytes.NewBufferString("")
-	//-- Do we Lookup Site
-	var p map[string]string
-	p = make(map[string]string)
-
-	for key, value := range u {
-		p[key] = fmt.Sprintf("%v", value)
-	}
-
-	userID := p[AzureImportConf.AzureConf.UserID]
-
-	//-- Loop Through UserProfileMapping
-	for key := range userCreateArray {
-		field := userCreateArray[key]
-		value := AzureImportConf.UserMapping[field] //userMappingMap[name]
-		t := template.New(field)
-		t, _ = t.Parse(value)
-		buf := bytes.NewBufferString("")
-		t.Execute(buf, p)
-		value = buf.String()
-		if value == "%!s(<nil>)" {
-			value = ""
-		}
-
-		//-- Process Site
-		if field == "Site" {
-			//-- Only use Site lookup if enabled and not set to Update only
-			if AzureImportConf.SiteLookup.Enabled && AzureImportConf.OrgLookup.Action != updateString {
-				value = getSiteFromLookup(value, buf2)
-			}
-		}
-		//-- Process Password Field
-		if field == "Password" {
-			if value == "" {
-				value = generatePasswordString(10)
-				logger(1, "Auto Generated Password for: "+userID+" - "+value, false)
-			}
-			value = base64.StdEncoding.EncodeToString([]byte(value))
-		}
-
-		//-- if we have Value then set it
-		if value != "" && value != "<nil>" && value != "&lt;nil&gt;" {
-			espXmlmc.SetParam(field, value)
-
-		}
-	}
-
-	//-- Check for Dry Run
-	if configDryRun != true {
-		XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userCreate")
-		var xmlRespon xmlmcResponse
-		if xmlmcErr != nil {
-			errorCountInc()
-			return false, xmlmcErr
-		}
-		err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
-		if err != nil {
-			errorCountInc()
-			return false, err
-		}
-		if xmlRespon.MethodResult != constOK {
-			err = errors.New(xmlRespon.State.ErrorRet)
-			errorCountInc()
-			return false, err
-
-		}
-		logger(1, "User Create Success", false)
-
-		//-- Only use Org lookup if enabled and not set to Update only
-		if AzureImportConf.OrgLookup.Enabled && AzureImportConf.OrgLookup.Action != updateString && len(AzureImportConf.OrgLookup.OrgUnits) > 0 {
-			userAddGroups(p, buf2)
-		}
-		//-- Process Account Status
-		if AzureImportConf.UserAccountStatus.Enabled && AzureImportConf.UserAccountStatus.Action != updateString {
-			userSetStatus(userID, AzureImportConf.UserAccountStatus.Status, buf2)
-		}
-
-		if AzureImportConf.UserRoleAction != updateString && len(AzureImportConf.Roles) > 0 {
-			userAddRoles(userID, buf2, espXmlmc)
-		}
-
-		//-- Add Image
-		if AzureImportConf.ImageLink.Enabled && AzureImportConf.ImageLink.Action != updateString && AzureImportConf.ImageLink.URI != "" {
-			userAddImage(p, buf2)
-		}
-
-		//-- Process Profile Details
-		boolUpdateProfile := userUpdateProfile(p, buf2, espXmlmc)
-		if boolUpdateProfile != true {
-			err = errors.New("User Profile issue (c): " + buf2.String())
-			errorCountInc()
-			return false, err
-		}
-
-		logger(1, buf2.String(), false)
-		createCountInc()
-		return true, nil
-	}
-
-	//-- DEBUG XML TO LOG FILE
-	var XMLSTRING = espXmlmc.GetParam()
-	logger(1, "User Create XML "+fmt.Sprintf("%v", XMLSTRING), false)
-	createSkippedCountInc()
-	espXmlmc.ClearParam()
-
-	return true, nil
 }
 
 func userUpdateProfile(p map[string]string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcInstStruct) bool {
 	UserID := p[AzureImportConf.AzureConf.UserID]
-	buffer.WriteString(loggerGen(1, "Processing User Profile Data "+UserID))
+	buffer.WriteString(loggerGen(1, "Processing User Profile Data "+UserID, true))
 	espXmlmc.OpenElement("profileData")
 	espXmlmc.SetParam("userID", UserID)
 	//-- Loop Through UserProfileMapping
@@ -640,16 +592,16 @@ func userUpdateProfile(p map[string]string, buffer *bytes.Buffer, espXmlmc *apiL
 
 	espXmlmc.CloseElement("profileData")
 	//-- Check for Dry Run
-	if configDryRun != true {
+	if !configDryRun {
 		XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userProfileSet")
 		var xmlRespon xmlmcResponse
 		if xmlmcErr != nil {
-			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", xmlmcErr)))
+			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", xmlmcErr), true))
 			return false
 		}
 		err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 		if err != nil {
-			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", err)))
+			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", err), true))
 
 			return false
 		}
@@ -659,28 +611,25 @@ func userUpdateProfile(p map[string]string, buffer *bytes.Buffer, espXmlmc *apiL
 				return true
 			}
 			err := errors.New(xmlRespon.State.ErrorRet)
-			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", err)))
+			buffer.WriteString(loggerGen(4, "Unable to Update User Profile: "+fmt.Sprintf("%v", err), true))
 			return false
 		}
 		profileCountInc()
-		buffer.WriteString(loggerGen(1, "User Profile Update Success"))
+		buffer.WriteString(loggerGen(1, "User Profile Update Success", true))
 		return true
 
 	}
 	//-- DEBUG XML TO LOG FILE
 	var XMLSTRING = espXmlmc.GetParam()
-	buffer.WriteString(loggerGen(1, "User Profile Update XML "+fmt.Sprintf("%v", XMLSTRING)))
+	buffer.WriteString(loggerGen(1, "User Profile Update XML "+fmt.Sprintf("%v", XMLSTRING), true))
 	profileSkippedCountInc()
 	espXmlmc.ClearParam()
 	return true
 
 }
 
-func userSetStatus(userID string, status string, buffer *bytes.Buffer) bool {
-	buffer.WriteString(loggerGen(1, "Set Status for User: "+fmt.Sprintf("%v", userID)+" Status:"+fmt.Sprintf("%v", status)))
-
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
+func userSetStatus(userID string, status string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcInstStruct) bool {
+	buffer.WriteString(loggerGen(1, "Set Status for User: "+fmt.Sprintf("%v", userID)+" Status:"+fmt.Sprintf("%v", status), true))
 
 	espXmlmc.SetParam("userId", userID)
 	espXmlmc.SetParam("accountStatus", status)
@@ -688,27 +637,26 @@ func userSetStatus(userID string, status string, buffer *bytes.Buffer) bool {
 	XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userSetAccountStatus")
 
 	var XMLSTRING = espXmlmc.GetParam()
-	buffer.WriteString(loggerGen(1, "User Create XML "+fmt.Sprintf("%v", XMLSTRING)))
+	buffer.WriteString(loggerGen(1, "User Set Status XML "+fmt.Sprintf("%v", XMLSTRING), true))
 
 	var xmlRespon xmlmcResponse
 	if xmlmcErr != nil {
-		logger(4, "Unable to Set User Status: "+fmt.Sprintf("%v", xmlmcErr), true)
-
+		buffer.WriteString(loggerGen(4, "Unable to Set User Status: "+fmt.Sprintf("%v", xmlmcErr), true))
 	}
 	err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Set User Status "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Set User Status "+fmt.Sprintf("%v", err), true))
 		return false
 	}
 	if xmlRespon.MethodResult != constOK {
 		if xmlRespon.State.ErrorRet != "Failed to update account status (target and the current status is the same)." {
-			buffer.WriteString(loggerGen(4, "Unable to Set User Status ("+fmt.Sprintf("%v", status)+"): "+xmlRespon.State.ErrorRet))
+			buffer.WriteString(loggerGen(4, "Unable to Set User Status ("+fmt.Sprintf("%v", status)+"): "+xmlRespon.State.ErrorRet, true))
 			return false
 		}
-		buffer.WriteString(loggerGen(1, "User Status Already Set to: "+fmt.Sprintf("%v", status)))
+		buffer.WriteString(loggerGen(1, "User Status Already Set to: "+fmt.Sprintf("%v", status), true))
 		return true
 	}
-	buffer.WriteString(loggerGen(1, "User Status Set Successfully"))
+	buffer.WriteString(loggerGen(1, "User Status Set Successfully", true))
 	return true
 }
 
@@ -717,24 +665,23 @@ func userAddRoles(userID string, buffer *bytes.Buffer, espXmlmc *apiLib.XmlmcIns
 	espXmlmc.SetParam("userId", userID)
 	for _, role := range AzureImportConf.Roles {
 		espXmlmc.SetParam("role", role)
-		buffer.WriteString(loggerGen(1, "Add Role to User: "+role))
+		buffer.WriteString(loggerGen(1, "Add Role to User: "+role, true))
 	}
 	XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userAddRole")
 	var xmlRespon xmlmcResponse
 	if xmlmcErr != nil {
-		logger(4, "Unable to Assign Role to User: "+fmt.Sprintf("%v", xmlmcErr), true)
-
+		buffer.WriteString(loggerGen(4, "Unable to Assign Role to User: "+fmt.Sprintf("%v", xmlmcErr), true))
 	}
 	err := xml.Unmarshal([]byte(XMLCreate), &xmlRespon)
 	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Assign Role to User: "+fmt.Sprintf("%v", err)))
+		buffer.WriteString(loggerGen(4, "Unable to Assign Role to User: "+fmt.Sprintf("%v", err), true))
 		return false
 	}
 	if xmlRespon.MethodResult != constOK {
-		buffer.WriteString(loggerGen(4, "Unable to Assign Role to User: "+xmlRespon.State.ErrorRet))
+		buffer.WriteString(loggerGen(4, "Unable to Assign Role to User: "+xmlRespon.State.ErrorRet, true))
 		return false
 	}
-	buffer.WriteString(loggerGen(1, "Roles Added Successfully"))
+	buffer.WriteString(loggerGen(1, "Roles Added Successfully", true))
 	return true
 }
 
@@ -761,129 +708,34 @@ func checkUserOnInstance(userID string, espXmlmc *apiLib.XmlmcInstStruct) (bool,
 	return xmlRespon.Params.RecordExist, nil
 }
 
-//-- Function to search for site
-func getSiteFromLookup(site string, buffer *bytes.Buffer) string {
-	siteReturn := ""
-
-	//-- Get Value of Attribute
-	siteAttributeName := processComplexField(site)
-	buffer.WriteString(loggerGen(1, "Looking Up Site: "+siteAttributeName))
-	if siteAttributeName == "" {
-		return ""
-	}
-	siteIsInCache, SiteIDCache := siteInCache(siteAttributeName)
-	//-- Check if we have Cached the site already
-	if siteIsInCache {
-		siteReturn = strconv.Itoa(SiteIDCache)
-		buffer.WriteString(loggerGen(1, "Found Site in Cache: "+siteReturn))
-	} else {
-		siteIsOnInstance, SiteIDInstance := searchSite(siteAttributeName, buffer)
-		//-- If Returned set output
-		if siteIsOnInstance {
-			siteReturn = strconv.Itoa(SiteIDInstance)
-		}
-	}
-	buffer.WriteString(loggerGen(1, "Site Lookup found ID: "+siteReturn))
-	return siteReturn
-}
-
-//-- Function to Check if in Cache
-func siteInCache(siteName string) (bool, int) {
-	boolReturn := false
-	intReturn := 0
-	mutexSites.Lock()
-	//-- Check if in Cache
-	for _, site := range sites {
-		if site.SiteName == siteName {
-			boolReturn = true
-			intReturn = site.SiteID
-			break
-		}
-	}
-	mutexSites.Unlock()
-	return boolReturn, intReturn
-}
-
-//-- Function to Check if site is on the instance
-func searchSite(siteName string, buffer *bytes.Buffer) (bool, int) {
-	boolReturn := false
-	intReturn := 0
-	//-- ESP Query for site
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
-	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
-	if siteName == "" {
-		return boolReturn, intReturn
-	}
-	espXmlmc.SetParam("entity", "Site")
-	espXmlmc.SetParam("matchScope", "all")
-	espXmlmc.OpenElement("searchFilter")
-	espXmlmc.SetParam("column", "h_site_name")
-	espXmlmc.SetParam("value", siteName)
-	//espXmlmc.SetParam("h_site_name", siteName)
-	espXmlmc.CloseElement("searchFilter")
-	espXmlmc.SetParam("maxResults", "1")
-	XMLSiteSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
-
-	var xmlRespon xmlmcSiteListResponse
-	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", xmlmcErr)))
-	}
-	err := xml.Unmarshal([]byte(XMLSiteSearch), &xmlRespon)
-	if err != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+fmt.Sprintf("%v", err)))
-	} else {
-		if xmlRespon.MethodResult != constOK {
-			buffer.WriteString(loggerGen(4, "Unable to Search for Site: "+xmlRespon.State.ErrorRet))
-		} else {
-			//-- Check Response
-			if xmlRespon.Params.RowData.Row.SiteName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.SiteName) == strings.ToLower(siteName) {
-					intReturn = xmlRespon.Params.RowData.Row.SiteID
-					boolReturn = true
-					//-- Add Site to Cache
-					mutexSites.Lock()
-					var newSiteForCache siteListStruct
-					newSiteForCache.SiteID = intReturn
-					newSiteForCache.SiteName = siteName
-					name := []siteListStruct{newSiteForCache}
-					sites = append(sites, name...)
-					mutexSites.Unlock()
-				}
-			}
-		}
-	}
-
-	return boolReturn, intReturn
-}
-
 func getManagerFromLookup(manager string, buffer *bytes.Buffer) string {
 
 	if manager == "" {
-		buffer.WriteString(loggerGen(1, "No Manager to search"))
+		buffer.WriteString(loggerGen(1, "No Manager to search", true))
 		return ""
 	}
 	//-- Get Value of Attribute
 	ManagerAttributeName := processComplexField(manager)
-	buffer.WriteString(loggerGen(1, "Manager Lookup: "+ManagerAttributeName))
+	buffer.WriteString(loggerGen(1, "Manager Lookup: "+ManagerAttributeName, true))
 
 	//-- Dont Continue if we didn't get anything
 	if ManagerAttributeName == "" {
 		return ""
 	}
 
-	buffer.WriteString(loggerGen(1, "Looking Up Manager "+ManagerAttributeName))
+	buffer.WriteString(loggerGen(1, "Looking Up Manager "+ManagerAttributeName, true))
 	managerIsInCache, ManagerIDCache := managerInCache(ManagerAttributeName)
 
 	//-- Check if we have Chached the site already
 	if managerIsInCache {
-		buffer.WriteString(loggerGen(1, "Found Manager in Cache "+ManagerIDCache))
+		buffer.WriteString(loggerGen(1, "Found Manager in Cache "+ManagerIDCache, true))
 		return ManagerIDCache
 	}
-	buffer.WriteString(loggerGen(1, "Manager Not In Cache Searching"))
+	buffer.WriteString(loggerGen(1, "Manager Not In Cache Searching", true))
 	ManagerIsOnInstance, ManagerIDInstance := searchManager(ManagerAttributeName, buffer)
 	//-- If Returned set output
 	if ManagerIsOnInstance {
-		buffer.WriteString(loggerGen(1, "Manager Lookup found Id "+ManagerIDInstance))
+		buffer.WriteString(loggerGen(1, "Manager Lookup found Id "+ManagerIDInstance, true))
 
 		return ManagerIDInstance
 	}
@@ -896,7 +748,7 @@ func searchManager(managerName string, buffer *bytes.Buffer) (bool, string) {
 	boolReturn := false
 	strReturn := ""
 	//-- ESP Query for site
-	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.URL)
+	espXmlmc := apiLib.NewXmlmcInstance(AzureImportConf.InstanceID)
 	espXmlmc.SetAPIKey(AzureImportConf.APIKey)
 	espXmlmc.SetTrace("AzureUserImport")
 	if managerName == "" {
@@ -908,31 +760,27 @@ func searchManager(managerName string, buffer *bytes.Buffer) (bool, string) {
 	espXmlmc.OpenElement("searchFilter")
 	espXmlmc.SetParam("column", "h_user_id")
 	espXmlmc.SetParam("value", managerName)
-	//espXmlmc.SetParam("h_user_id", managerName)
-	//	espXmlmc.SetParam("h_name", managerName)
 	espXmlmc.CloseElement("searchFilter")
 	espXmlmc.SetParam("maxResults", "1")
 	XMLUserSearch, xmlmcErr := espXmlmc.Invoke("data", "entityBrowseRecords2")
 	var xmlRespon xmlmcUserListResponse
 	if xmlmcErr != nil {
-		buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+fmt.Sprintf("%v", xmlmcErr)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+fmt.Sprintf("%v", xmlmcErr), true))
 	}
 	err := xml.Unmarshal([]byte(XMLUserSearch), &xmlRespon)
 	if err != nil {
 		stringError := err.Error()
 		stringBody := string(XMLUserSearch)
-		buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+fmt.Sprintf("%v", stringError+" RESPONSE BODY: "+stringBody)))
+		buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+fmt.Sprintf("%v", stringError+" RESPONSE BODY: "+stringBody), true))
 	} else {
 		if xmlRespon.MethodResult != constOK {
-			buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+xmlRespon.State.ErrorRet))
+			buffer.WriteString(loggerGen(4, "Unable to Search for Manager: "+xmlRespon.State.ErrorRet, true))
 		} else {
 			//-- Check Response
 			if xmlRespon.Params.RowData.Row.UserName != "" {
-				if strings.ToLower(xmlRespon.Params.RowData.Row.UserID) == strings.ToLower(managerName) {
-
+				if strings.EqualFold(xmlRespon.Params.RowData.Row.UserID, managerName) {
 					strReturn = xmlRespon.Params.RowData.Row.UserID
 					boolReturn = true
-					//-- Add Site to Cache
 					mutexManagers.Lock()
 					var newManagerForCache managerListStruct
 					newManagerForCache.UserID = strReturn
@@ -954,21 +802,11 @@ func managerInCache(managerName string) (bool, string) {
 	//-- Check if in Cache
 	mutexManagers.Lock()
 	for _, manager := range managers {
-		if strings.ToLower(manager.UserName) == strings.ToLower(managerName) {
+		if strings.EqualFold(manager.UserName, managerName) {
 			boolReturn = true
 			stringReturn = manager.UserID
 		}
 	}
 	mutexManagers.Unlock()
 	return boolReturn, stringReturn
-}
-
-//-- Generate Password String
-func generatePasswordString(n int) string {
-	var arbytes = make([]byte, n)
-	rand.Read(arbytes)
-	for i, b := range arbytes {
-		arbytes[i] = letterBytes[b%byte(len(letterBytes))]
-	}
-	return string(arbytes)
 }
