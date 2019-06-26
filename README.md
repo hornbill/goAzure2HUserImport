@@ -1,4 +1,4 @@
-### Azure Import Go - [GO](https://golang.org/) Import Script to Hornbill
+# Azure Import Go - [GO](https://golang.org/) Import Script to Hornbill
 
 Please see [Azure User Import](https://wiki.hornbill.com/index.php/Azure_User_Import) for instructions.
 

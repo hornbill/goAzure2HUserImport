@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2.1.1 (26th June, 2019)
+
+Fixes:
+
+- Fixed issue where generating random password string would fail if requested length of password was less that the sum of the minimum character type settings
+  
+Changes:
+
+- Updated minimum password length to 16
+
 ## 2.1.0 (29th May, 2019)
 
 Features:

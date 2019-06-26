@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	version      = "2.1.0"
+	version      = "2.1.1"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"
@@ -16,7 +16,7 @@ const (
 //Password profiles
 var passwordProfile passwordProfileStruct
 var blacklistURLs = [...]string{"https://files.hornbill.com/hornbillStatic/password_blacklists/SplashData.txt", "https://files.hornbill.com/hornbillStatic/password_blacklists/Imperva.txt"}
-var defaultPasswordLength = 10
+var defaultPasswordLength = 16
 
 type passwordProfileStruct struct {
 	Length              int

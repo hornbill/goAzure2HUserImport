@@ -84,7 +84,10 @@ func getPasswordProfile() {
 			passwordProfile.ForceUpper, _ = strconv.Atoi(val.Value)
 		}
 	}
-
+	totalForce := passwordProfile.ForceLower + passwordProfile.ForceNumeric + passwordProfile.ForceSpecial + passwordProfile.ForceUpper
+	if passwordProfile.Length < totalForce {
+		passwordProfile.Length = totalForce
+	}
 }
 
 func processBlacklists() []string {
