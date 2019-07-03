@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2.2.0 (3rd July, 2019)
+
+Features:
+
+- Added debug mode to output more detailed logging
+
 ## 2.1.1 (26th June, 2019)
 
 Fixes:

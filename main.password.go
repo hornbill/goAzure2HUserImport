@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,8 +14,11 @@ import (
 )
 
 //-- Generate Password String
-func generatePasswordString(userID string, mustNotContain []string) string {
+func generatePasswordString(userID string, mustNotContain []string, buffer *bytes.Buffer) string {
 	pwdinst := hornbillpasswordgen.NewPasswordInstance()
+	if configDebug {
+		pwdinst.SetDebug()
+	}
 	pwdinst.Length = passwordProfile.Length
 	pwdinst.UseLower = true
 	pwdinst.ForceLower = passwordProfile.ForceLower
@@ -30,11 +34,17 @@ func generatePasswordString(userID string, mustNotContain []string) string {
 	}
 
 	//Generate a new password
-	newPassword, err := pwdinst.GenPassword()
+	newPassword, debug, err := pwdinst.GenPassword()
 
 	if err != nil {
-		logger(4, "Failed Password Auto Generation for: "+userID+"  "+fmt.Sprintf("%v", err), false)
+		buffer.WriteString(loggerGen(4, "Failed Password Auto Generation for: "+userID+"  "+fmt.Sprintf("%v", err), true))
 		return ""
+	}
+	if configDebug && len(debug) > 0 {
+		buffer.WriteString(loggerGen(1, "[PASSWORD] Debugging information from password generator:", true))
+		for _, v := range debug {
+			buffer.WriteString(loggerGen(1, "[PASSWORD] "+v, true))
+		}
 	}
 	return newPassword
 }
@@ -87,6 +97,17 @@ func getPasswordProfile() {
 	totalForce := passwordProfile.ForceLower + passwordProfile.ForceNumeric + passwordProfile.ForceSpecial + passwordProfile.ForceUpper
 	if passwordProfile.Length < totalForce {
 		passwordProfile.Length = totalForce
+	}
+	if configDebug {
+		logger(1, "Password Profile", false)
+		blacklist := strings.Join(passwordProfile.Blacklist, ", ")
+		logger(1, "checkBlacklists: "+blacklist, false)
+		logger(1, "checkPersonalInfo: "+strconv.FormatBool(passwordProfile.CheckMustNotContain), false)
+		logger(1, "minimumLength: "+strconv.Itoa(passwordProfile.Length), false)
+		logger(1, "mustContainLowerCase: "+strconv.Itoa(passwordProfile.ForceLower), false)
+		logger(1, "mustContainNumeric: "+strconv.Itoa(passwordProfile.ForceNumeric), false)
+		logger(1, "mustContainSpecial: "+strconv.Itoa(passwordProfile.ForceSpecial), false)
+		logger(1, "mustContainUpperCase: "+strconv.Itoa(passwordProfile.ForceUpper), false)
 	}
 }
 

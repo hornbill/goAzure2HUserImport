@@ -108,14 +108,26 @@ func createUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
 		}
 		//-- Process Password Field
 		if field == "Password" {
+			if configDebug {
+				buf2.WriteString(loggerGen(1, "[PASSWORD] Key Exists. Value: ["+value+"]", true))
+			}
 			if value == "" {
+				if configDebug {
+					buf2.WriteString(loggerGen(1, "[PASSWORD] Value empty", true))
+				}
 				userArr := []string{userID, userFirstName, userLastName}
-				value = generatePasswordString(userID, userArr)
-				if value != "" {
+				value = generatePasswordString(userID, userArr, buf2)
+				if configDebug {
 					buf2.WriteString(loggerGen(1, "Auto Generated Password for: "+userID+" - "+value, true))
+				}
+				if value == "" {
+					buf2.WriteString(loggerGen(4, "Unable to generate password for: "+userID, true))
 				}
 			}
 			value = base64.StdEncoding.EncodeToString([]byte(value))
+			if configDebug {
+				buf2.WriteString(loggerGen(1, "[PASSWORD] B64 encoded value: "+value, true))
+			}
 		}
 
 		//-- if we have Value then set it
@@ -127,6 +139,11 @@ func createUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
 
 	//-- Check for Dry Run
 	if !configDryRun {
+		if configDebug {
+			//-- DEBUG XML TO LOG FILE
+			var XMLSTRING = espXmlmc.GetParam()
+			buf2.WriteString(loggerGen(1, "User Create XML "+fmt.Sprintf("%v", XMLSTRING), true))
+		}
 
 		XMLCreate, xmlmcErr := espXmlmc.Invoke("admin", "userCreate")
 		var xmlRespon xmlmcResponse
@@ -185,7 +202,7 @@ func createUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
 
 	//-- DEBUG XML TO LOG FILE
 	var XMLSTRING = espXmlmc.GetParam()
-	buf2.WriteString(loggerGen(4, "User Create XML "+fmt.Sprintf("%v", XMLSTRING), true))
+	buf2.WriteString(loggerGen(1, "User Create XML "+fmt.Sprintf("%v", XMLSTRING), true))
 	createSkippedCountInc()
 	espXmlmc.ClearParam()
 	logger(0, buf2.String(), false)
@@ -238,6 +255,11 @@ func updateUser(u map[string]interface{}, espXmlmc *apiLib.XmlmcInstStruct) {
 
 	//-- Check for Dry Run
 	if !configDryRun {
+		if configDebug {
+			//-- DEBUG XML TO LOG FILE
+			var XMLSTRING = espXmlmc.GetParam()
+			buf2.WriteString(loggerGen(1, "User Update XML "+fmt.Sprintf("%v", XMLSTRING), true))
+		}
 		XMLUpdate, xmlmcErr := espXmlmc.Invoke("admin", "userUpdate")
 		var xmlRespon xmlmcResponse
 		if xmlmcErr != nil {

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	version      = "2.1.1"
+	version      = "2.2.0"
 	constOK      = "ok"
 	updateString = "Update"
 	createString = "Create"
@@ -44,14 +44,15 @@ type xmlmcSettingResponse struct {
 
 var (
 	//AzureImportConf - Holds the import configuration from the JSON file
-	AzureImportConf    AzureImportConfStruct
-	sites              []siteListStruct
-	managers           []managerListStruct
-	groups             []groupListStruct
-	counters           counterTypeStruct
-	configFileName     string
-	configZone         string
+	AzureImportConf AzureImportConfStruct
+	sites           []siteListStruct
+	managers        []managerListStruct
+	groups          []groupListStruct
+	counters        counterTypeStruct
+	configFileName  string
+	//configZone         string
 	configLogPrefix    string
+	configDebug        bool
 	configDryRun       bool
 	configVersion      bool
 	configMaxRoutines  int

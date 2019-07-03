@@ -102,8 +102,8 @@ func initVars() {
 func procFlags() {
 	//-- Grab Flags
 	flag.StringVar(&configFileName, "file", "conf.json", "Name of Configuration File To Load")
-	flag.StringVar(&configZone, "zone", "eur", "Override the default Zone the instance sits in")
 	flag.StringVar(&configLogPrefix, "logprefix", "", "Add prefix to the logfile")
+	flag.BoolVar(&configDebug, "debug", false, "Enable additional debug logging")
 	flag.BoolVar(&configDryRun, "dryrun", false, "Allow the Import to run without Creating or Updating users")
 	flag.BoolVar(&configVersion, "version", false, "Output Version")
 	flag.IntVar(&configMaxRoutines, "concurrent", 1, "Maximum number of users to import concurrently.")
@@ -152,7 +152,6 @@ func outputFlags() {
 	logger(1, "---- XMLMC Azure Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
 
 	logger(1, "Flag - Config File "+configFileName, true)
-	logger(1, "Flag - Zone "+configZone, true)
 	logger(1, "Flag - Log Prefix "+configLogPrefix, true)
 	logger(1, "Flag - Dry Run "+fmt.Sprintf("%v", configDryRun), true)
 	logger(1, "Flag - Workers "+fmt.Sprintf("%v", configMaxRoutines), false)
