@@ -70,34 +70,76 @@ func getPasswordProfile() {
 		logger(4, "Error returned from sysOptionGet "+JSONResp.State.ErrorRet, false)
 		return
 	}
+
 	//Process Password Profile
 	//--Work through profile settings
 	for _, val := range JSONResp.Params.Option {
 		switch val.Key {
 		case "security.user.passwordPolicy.checkBlacklists":
-			passwordProfile.Blacklist = processBlacklists()
+			checkMustNotContain, _ := strconv.ParseBool(val.Value)
+			if checkMustNotContain {
+				passwordProfile.Blacklist = processBlacklists()
+			}
 		case "security.user.passwordPolicy.checkPersonalInfo":
-			passwordProfile.CheckMustNotContain, _ = strconv.ParseBool(val.Value)
+			passwordProfile.CheckMustNotContain, err = strconv.ParseBool(val.Value)
+			if err != nil {
+				passwordProfile.CheckMustNotContain = false
+				if configDebug {
+					logger(3, "Unable to read password policy checkPersonalInfo value: "+err.Error(), false)
+				}
+			}
 		case "security.user.passwordPolicy.minimumLength":
 			if val.Value == "0" {
 				passwordProfile.Length = defaultPasswordLength
 			} else {
-				passwordProfile.Length, _ = strconv.Atoi(val.Value)
+				passwordProfile.Length, err = strconv.Atoi(val.Value)
+				if err != nil {
+					passwordProfile.Length = defaultPasswordLength
+					if configDebug {
+						logger(3, "Unable to read password policy length, setting to default of "+strconv.Itoa(defaultPasswordLength)+": "+err.Error(), false)
+					}
+				}
 			}
 		case "security.user.passwordPolicy.mustContainLowerCase":
-			passwordProfile.ForceLower, _ = strconv.Atoi(val.Value)
+			passwordProfile.ForceLower, err = strconv.Atoi(val.Value)
+			if err != nil && configDebug {
+				logger(3, "Unable to read password policy mustContainLowerCase value: "+err.Error(), false)
+			}
 		case "security.user.passwordPolicy.mustContainNumeric":
-			passwordProfile.ForceNumeric, _ = strconv.Atoi(val.Value)
+			passwordProfile.ForceNumeric, err = strconv.Atoi(val.Value)
+			if err != nil && configDebug {
+				logger(3, "Unable to read password policy mustContainNumeric value: "+err.Error(), false)
+			}
 		case "security.user.passwordPolicy.mustContainSpecial":
-			passwordProfile.ForceSpecial, _ = strconv.Atoi(val.Value)
+			passwordProfile.ForceSpecial, err = strconv.Atoi(val.Value)
+			if err != nil && configDebug {
+				logger(3, "Unable to read password policy mustContainSpecial value: "+err.Error(), false)
+			}
 		case "security.user.passwordPolicy.mustContainUpperCase":
-			passwordProfile.ForceUpper, _ = strconv.Atoi(val.Value)
+			passwordProfile.ForceUpper, err = strconv.Atoi(val.Value)
+			if err != nil && configDebug {
+				logger(3, "Unable to read password policy mustContainUpperCase value: "+err.Error(), false)
+			}
 		}
 	}
+	if passwordProfile.Length == 0 {
+		passwordProfile.Length = defaultPasswordLength
+		if configDebug {
+			logger(3, "Password policy length set to 0 after reading policy, setting to default of "+strconv.Itoa(defaultPasswordLength)+": ", false)
+		}
+	}
+
 	totalForce := passwordProfile.ForceLower + passwordProfile.ForceNumeric + passwordProfile.ForceSpecial + passwordProfile.ForceUpper
 	if passwordProfile.Length < totalForce {
 		passwordProfile.Length = totalForce
 	}
+	if passwordProfile.Length == 0 {
+		passwordProfile.Length = defaultPasswordLength
+		if configDebug {
+			logger(3, "Password policy length STILL set to 0 after checking force values in policy, setting to default of "+strconv.Itoa(defaultPasswordLength)+": ", false)
+		}
+	}
+
 	if configDebug {
 		logger(1, "Password Profile", false)
 		blacklist := strings.Join(passwordProfile.Blacklist, ", ")

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2.2.1 (4th July, 2019)
+
+Features:
+
+- Added additional logic to avoid 0 length password requests
+- Added more debug logging around reading password profile from instance
+
 ## 2.2.0 (3rd July, 2019)
 
 Features:
