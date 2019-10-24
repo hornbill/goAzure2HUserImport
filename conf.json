@@ -1,18 +1,11 @@
 {
     "APIKey": "",
     "InstanceId": "",
-    "UpdateUserType": false,
-    "UserRoleAction": "Create",
-    "AzureConf": {
-        "Tenant": "",
+    "AzureConf": {    
+	"Tenant": "",
         "ClientID": "",
         "ClientSecret": "",
         "UserFilter": "startswith(displayName,'Dave')",
-        "UserProperties": [
-            "employeeId",
-            "mailNickname"
-        ],
-        "UserID": "userPrincipalName",
         "Debug": false,
         "APIVersion":"v1.0",
         "Search":"groups",
@@ -25,102 +18,129 @@
                 "ObjectID":"Second Group Object ID",
                 "Name":"Second Group Object Name"
             }
-        ]
+        ] 
     },
-    "UserMapping":{
-        "userId":"{{.mail}}",
-        "UserType":"basic",
-        "Name":"{{.givenName}} {{.surname}}",
-        "Password":"",
-        "FirstName":"{{.givenName}}",
-        "LastName":"{{.surname}}",
-        "JobTitle":"",
-        "Site":"{{.physicalDeliverOfficeName}}",
-        "Phone":"{{.telephoneNumber}}",
-        "Email":"{{.mail}}",
-        "Mobile":"{{.mobile}}",
-        "AbsenceMessage":"",
-        "TimeZone":"",
-        "Language":"",
-        "DateTimeFormat":"",
-        "DateFormat":"",
-        "TimeFormat":"",
-        "CurrencySymbol":"",
-        "CountryCode":""
-    },
-    "UserAccountStatus":{
-        "Action":"Both",
-        "Enabled": false,
-        "Status":"active"
-    },
-    "UserProfileMapping":{
-        "MiddleName":"",
-        "JobDescription":"",
-        "Manager":"{{.manager}}",
-        "WorkPhone":"",
-        "Qualifications":"",
-        "Interests":"",
-        "Expertise":"",
-        "Gender":"",
-        "Dob":"",
-        "Nationality":"",
-        "Religion":"",
-        "HomeTelephone":"{{.telephoneNumber}}",
-        "SocialNetworkA":"",
-        "SocialNetworkB":"",
-        "SocialNetworkC":"",
-        "SocialNetworkD":"",
-        "SocialNetworkE":"",
-        "SocialNetworkF":"",
-        "SocialNetworkG":"",
-        "SocialNetworkH":"",
-        "PersonalInterests":"",
-        "homeAddress":"",
-        "PersonalBlog":"",
-        "Attrib1":"",
-    	"Attrib2":"",
-    	"Attrib3":"",
-    	"Attrib4":"",
-    	"Attrib5":"",
-    	"Attrib6":"",
-    	"Attrib7":"",
-    	"Attrib8":""
-    }
-    , "UserManagerMapping":{
-        "Action":"Both"
-        , "Enabled":true
-    }
-    , "Roles":[
-        "Basic User Role"
-    ]
-    , "SiteLookup":{
-        "Action":"Both"
-        , "Enabled": true
-    }
-    , "ImageLink":{
-        "Action":"Both"
-        , "Enabled": false
-        , "UploadType": "URL"
-        , "ImageType": "jpg"
-        , "URI": "http://whatever.server.com/userdb/images/{{.mail}}.jpg"
-    }
-    , "OrgLookup":{
-        "Action":"Both"
-        , "Enabled":true
-        , "OrgUnits":[
-            {
-                "Attribute":"{{.department}}",
-                "Type":2,
-                "Membership":"member",
-                "TasksView":false,
-                "TasksAction":false
-            }, {
-                "Attribute":"{{.companyName}}",
-                "Type":5,
-                "Membership":"member",
-                "TasksView":false,
-                "TasksAction":false
-            }
-        ]
+    "User": {
+	"UserDN": "{{.userPrincipalName}}"
+	,"AccountMapping":{
+		"UserID":"{{.userPrincipalName}}",
+		"UserType":"basic",
+		"Name":"{{.givenName}} {{.surname}}",
+		"Password":"",
+		"FirstName":"{{.givenName}}",
+		"LastName":"{{.surname}}",
+		"JobTitle":"",
+		"Site":"{{.physicalDeliverOfficeName}}",
+		"Phone":"{{.telephoneNumber}}",
+		"Email":"{{.mail}}",
+		"Mobile":"{{.mobile}}",
+		"AbsenceMessage":"",
+		"TimeZone":"",
+		"Language":"",
+		"DateTimeFormat":"",
+		"DateFormat":"",
+		"TimeFormat":"",
+		"CurrencySymbol":"",
+		"CountryCode":""
+	},
+	"Type":{
+		"Action":"Both"
+	},
+	"Status":{
+		"Action":"Both",
+		"Value":"active"
+	},
+	"Role":{
+	    "Action":"Both"
+	    , "Roles":[
+		"Basic User Role"
+	    ]
+	},
+	"ProfileMapping":{
+		"MiddleName":"",
+		"JobDescription":"",
+		"Manager":"{{.manager}}",
+		"WorkPhone":"",
+		"Qualifications":"",
+		"Interests":"",
+		"Expertise":"",
+		"Gender":"",
+		"Dob":"",
+		"Nationality":"",
+		"Religion":"",
+		"HomeTelephone":"{{.telephoneNumber}}",
+		"SocialNetworkA":"",
+		"SocialNetworkB":"",
+		"SocialNetworkC":"",
+		"SocialNetworkD":"",
+		"SocialNetworkE":"",
+		"SocialNetworkF":"",
+		"SocialNetworkG":"",
+		"SocialNetworkH":"",
+		"PersonalInterests":"",
+		"homeAddress":"",
+		"PersonalBlog":"",
+		"Attrib1":"1",
+		"Attrib2":"2",
+		"Attrib3":"3",
+		"Attrib4":"4",
+		"Attrib5":"5",
+		"Attrib6":"6",
+		"Attrib7":"7",
+		"Attrib8":"8"
+	}
+	, "Manager":{
+		"Action": "Both"
+		, "Value": "{{.manager}}"
+		, "Options": {
+			"GetStringFromValue": {
+				"Regex" : ""
+				, "Reverse": false
+			}
+			, "MatchAgainstDistinguishedName": false
+			, "Search": {
+				"Enable": true
+				, "SearchField": ""
+			}
+		}
+	}
+	, "Image":{
+		"Action":"Both"
+		, "UploadType": "AZURE"
+		, "InsecureSkipVerify": false
+		, "ImageType": "jpg"
+		, "URI": "{{.userPrincipalName}}"
+	}
+	, "Site":{
+		"Action":"Both"
+		, "Value": "{{.physicalDeliverOfficeName}}"
+	}
+	, "Org":[
+		{
+			"Action":"Both"
+			, "value":"{{.department}}"
+			, "MemberOf":""
+			, "Options": {
+				"Type":2,
+				"Membership":"member",
+				"TasksView":false,
+				"TasksAction":false,
+				"OnlyOneGroupAssignment":false
+			}
+		}
+		, {
+			"Action":"Both"
+			, "value":"{{.companyName}}"
+			, "MemberOf":""
+			, "Options": {
+				"Type":5,
+				"Membership":"member",
+				"TasksView":false,
+				"TasksAction":false,
+				"OnlyOneGroupAssignment":false
+			}
+		}
+
+	]
     }
 }

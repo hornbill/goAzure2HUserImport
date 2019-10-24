@@ -1,19 +1,27 @@
 # CHANGELOG
 
-## 2.2.1 (4th July, 2019)
+## 2.3.0 (23rd October, 2019)
+
+Changes:
+
+- Reworking to match LDAP imports - but with local configuration file
+- PLEASE NOTE the CONFIGURATION file has changed significantly.
+- Added feature to allow the setting of a Home Organisation when creating/updating users
+
+## 2.2.1 (4th July, 2019)
 
 Features:
 
 - Added additional logic to avoid 0 length password requests
 - Added more debug logging around reading password profile from instance
 
-## 2.2.0 (3rd July, 2019)
+## 2.2.0 (3rd July, 2019)
 
 Features:
 
 - Added debug mode to output more detailed logging
 
-## 2.1.1 (26th June, 2019)
+## 2.1.1 (26th June, 2019)
 
 Fixes:
 
