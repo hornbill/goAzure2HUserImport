@@ -6,20 +6,20 @@ import (
 )
 
 //----- Constants -----
-const version = "2.3.0"
+const version = "2.4.0"
 const app_name = "goAzure2HUserImport"
 const apiResource = "https://graph.microsoft.com"
-
+const employeeIDMinServerBuild = 3241
 
 var mutexCounters = &sync.Mutex{}
 var bufferMutex = &sync.Mutex{}
 var importHistoryID string
 var maxGoroutines = 6
+var serverBuild int
 
-var globalBearerToken   = ""
-var globalTokenExpiry   int64
-var strAzurePagerToken  = ""
-
+var globalBearerToken = ""
+var globalTokenExpiry int64
+var strAzurePagerToken = ""
 
 var localDBUsers []map[string]interface{}
 
@@ -205,7 +205,7 @@ type groupConfStruct struct {
 type AzureImportConfStruct struct {
 	APIKey     string `json:"APIKey"`
 	InstanceID string `json:"InstanceId"`
-	AzureConf    sqlConfStruct
+	AzureConf  sqlConfStruct
 	User       struct {
 		AccountMapping AccountMappingStruct `json:"AccountMapping"`
 		UserDN         string               `json:"UserDN"`
@@ -281,6 +281,8 @@ type AzureImportConfStruct struct {
 // AccountMappingStruct Used
 type AccountMappingStruct struct {
 	UserID         string `json:"UserID"`
+	LoginID        string `json:"LoginId"`
+	EmployeeID     string `json:"EmployeeId"`
 	UserType       string `json:"UserType"`
 	Name           string `json:"Name"`
 	Password       string `json:"Password"`
@@ -368,6 +370,8 @@ type groupStruct struct {
 }
 type userAccountStruct struct {
 	HUserID              string `json:"h_user_id"`
+	HLoginID             string `json:"h_login_id"`
+	HEmployeeID          string `json:"h_employee_id"`
 	HName                string `json:"h_name"`
 	HFirstName           string `json:"h_first_name"`
 	HMiddleName          string `json:"h_middle_name"`
@@ -508,4 +512,12 @@ type stateJSONStruct struct {
 type xmlmcResponse struct {
 	MethodResult string          `json:"status,attr"`
 	State        stateJSONStruct `json:"state"`
+}
+
+type xmlmcLicenseInfo struct {
+	MethodResult string `json:"status,attr"`
+	Params       struct {
+		ServerBuild int
+	} `json:"params"`
+	State stateJSONStruct `json:"state"`
 }

@@ -397,6 +397,14 @@ func checkUserNeedsSiteUpdate(importData *userWorkingDataStruct, currentData use
 	return false
 }
 func checkUserNeedsUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
+	if importData.Account.LoginID != "" && importData.Account.LoginID != currentData.HLoginID {
+		logger(1, "LoginID: "+importData.Account.LoginID+" - "+currentData.HLoginID, true)
+		return true
+	}
+	if importData.Account.EmployeeID != "" && importData.Account.EmployeeID != currentData.HEmployeeID {
+		logger(1, "EmployeeID: "+importData.Account.EmployeeID+" - "+currentData.HEmployeeID, true)
+		return true
+	}
 	if importData.Account.Name != "" && importData.Account.Name != currentData.HName {
 		logger(1, "Name: "+importData.Account.Name+" - "+currentData.HName, true)
 		return true
@@ -679,7 +687,8 @@ func processImportActions(l *map[string]interface{}) string {
 func processUserParams(l *map[string]interface{}, userID string) {
 
 	data := HornbillCache.UsersWorking[userID]
-
+	data.Account.LoginID = getUserFieldValue(l, "LoginID", data.Custom)
+	data.Account.EmployeeID = getUserFieldValue(l, "EmployeeID", data.Custom)
 	data.Account.UserType = getUserFieldValue(l, "UserType", data.Custom)
 	data.Account.Name = getUserFieldValue(l, "Name", data.Custom)
 	data.Account.Password = getUserFieldValue(l, "Password", data.Custom)

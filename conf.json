@@ -24,6 +24,8 @@
 	"UserDN": "{{.userPrincipalName}}"
 	,"AccountMapping":{
 		"UserID":"{{.userPrincipalName}}",
+		"LoginID":"{{.userPrincipalName}}",
+		"EmployeeID":"{{.userPrincipalName}}",
 		"UserType":"basic",
 		"Name":"{{.givenName}} {{.surname}}",
 		"Password":"",

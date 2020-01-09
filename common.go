@@ -469,3 +469,32 @@ func getInstanceURL() string {
 	return xmlmcInstanceConfig.url
 }
 */
+
+func getServerBuild() {
+	loggerAPI = apiLib.NewXmlmcInstance(Flags.configInstanceID)
+	loggerAPI.SetAPIKey(Flags.configAPIKey)
+	loggerAPI.SetTimeout(Flags.configAPITimeout)
+	loggerAPI.SetJSONResponse(true)
+	RespBody, xmlmcErr := loggerAPI.Invoke("session", "getSystemLicenseInfo")
+
+	var JSONResp xmlmcLicenseInfo
+	if xmlmcErr != nil {
+		logger(4, "Unable to Query Server Build: "+fmt.Sprintf("%s", xmlmcErr), true)
+		return
+	}
+	err := json.Unmarshal([]byte(RespBody), &JSONResp)
+	if err != nil {
+		logger(4, "Unable to Query Server Build: "+fmt.Sprintf("%s", err), true)
+		return
+	}
+	if JSONResp.State.Error != "" {
+		logger(4, "Unable to Query Server Build: "+JSONResp.State.Error, true)
+		return
+	}
+
+	if JSONResp.Params.ServerBuild > 0 {
+		serverBuild = JSONResp.Params.ServerBuild
+	} else {
+		logger(4, "Server build not returned", true)
+	}
+}
