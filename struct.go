@@ -6,7 +6,7 @@ import (
 )
 
 //----- Constants -----
-const version = "2.4.0"
+const version = "2.4.1"
 const app_name = "goAzure2HUserImport"
 const apiResource = "https://graph.microsoft.com"
 const employeeIDMinServerBuild = 3241
