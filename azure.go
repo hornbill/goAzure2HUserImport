@@ -188,7 +188,7 @@ func queryAzure() (bool) {
 		strAzurePagerToken = ""
 	}
 	logger(2, fmt.Sprintf("[Azure] Found %d results", intUserCount), false)
-	localDBUsers = ArrUserMaps
+	localDBUsers = append(localDBUsers, ArrUserMaps...)
 	return true
 }
 
@@ -368,7 +368,7 @@ func queryGroup(groupID string) (bool) {
 
 	logger(2, fmt.Sprintf("[Azure] Found %d Users", intUserCount), true)
 	if intUserCount > 0 {
-		localDBUsers = ArrUserMaps
+		localDBUsers = append(localDBUsers, ArrUserMaps...)
 		return true
 	}
 

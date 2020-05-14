@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2.4.2 (May 14th, 2020)
+
+Fix:
+
+- Fix to Group selection - only last Azure results from last selected group would be processed
+
 ## 2.4.1 (April 15th, 2020)
 
 Change:
