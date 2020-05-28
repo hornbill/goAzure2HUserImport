@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
+
 	apiLib "github.com/hornbill/goApiLib"
 )
 
@@ -85,8 +85,6 @@ func userCreate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 	if user.Account.CountryCode != "" {
 		hIF.SetParam("countryCode", user.Account.CountryCode)
 	}
-	//hIF.SetParam("notifyEmail", "")
-	//hIF.SetParam("notifyTextMessage", "")
 
 	//-- Dry Run
 	if Flags.configDryRun {
@@ -96,16 +94,13 @@ func userCreate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 		hIF.ClearParam()
 		return true, nil
 	}
-	var XMLSTRING = hIF.GetParam()
-	fmt.Println(XMLSTRING)
 
 	RespBody, xmlmcErr := hIF.Invoke("admin", "userCreate")
 	var JSONResp xmlmcResponse
 	if xmlmcErr != nil {
 		return false, xmlmcErr
 	}
-	fmt.Println(RespBody)
-	return true, nil
+
 	err := json.Unmarshal([]byte(RespBody), &JSONResp)
 	if err != nil {
 		return false, err
@@ -372,7 +367,7 @@ func userRolesUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, b
 func userStatusUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer *bytes.Buffer) (bool, error) {
 
 	hIF.SetParam("userId", user.Account.UserID)
-	hIF.SetParam("accountStatus", AzureImportConf.User.Status.Value)
+	hIF.SetParam("accountStatus", azureImportConf.User.Status.Value)
 
 	var XMLSTRING = hIF.GetParam()
 	if Flags.configDryRun {

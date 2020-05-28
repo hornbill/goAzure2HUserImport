@@ -31,7 +31,6 @@ func processRegexOnString(reg string, input string) string {
 	strReturn := ""
 	//-- Loop Matches
 	for _, match := range result {
-		//fmt.Printf("match: %s \n", match)
 		strReturn = match
 
 		if strReturn != "" {
@@ -42,10 +41,9 @@ func processRegexOnString(reg string, input string) string {
 	return strReturn
 }
 
-//func getUserFieldValue(u *ldap.Entry, s string, custom map[string]string) string {
 func getUserFieldValue(u *map[string]interface{}, s string, custom map[string]string) string {
 	//-- Dyniamicly Grab Mapped Value
-	r := reflect.ValueOf(AzureImportConf.User.AccountMapping)
+	r := reflect.ValueOf(azureImportConf.User.AccountMapping)
 	f := reflect.Indirect(r).FieldByName(s)
 	//-- Get Mapped Value
 	var UserMapping = f.String()
@@ -55,10 +53,9 @@ func getUserFieldValue(u *map[string]interface{}, s string, custom map[string]st
 }
 
 //-- Get XMLMC Feild from mapping via profile Object
-//func getProfileFieldValue(u *ldap.Entry, s string, custom map[string]string) string {
 func getProfileFieldValue(u *map[string]interface{}, s string, custom map[string]string) string {
 	//-- Dyniamicly Grab Mapped Value
-	r := reflect.ValueOf(AzureImportConf.User.ProfileMapping)
+	r := reflect.ValueOf(azureImportConf.User.ProfileMapping)
 
 	f := reflect.Indirect(r).FieldByName(s)
 
@@ -69,17 +66,14 @@ func getProfileFieldValue(u *map[string]interface{}, s string, custom map[string
 	return stringToReturn
 }
 
-//-- Match any value wrapped in [] and get its DB Attribute Value
-//func processComplexField(u *ldap.Entry, s string) string {
+//-- Match any value wrapped in [] and get its Azure Attribute Value
 func processComplexField(u *map[string]interface{}, s string) string {
-
-	//buf2 := bytes.NewBufferString("")
-	//-- Do we Lookup Site
 	var p map[string]string
 	p = make(map[string]string)
-	//fmt.Println("%v", u)
 	for key, value := range *u {
-		p[key] = fmt.Sprintf("%s", value)
+		if value != nil {
+			p[key] = fmt.Sprintf("%s", value)
+		}
 	}
 
 	t := template.New(s)
@@ -87,43 +81,11 @@ func processComplexField(u *map[string]interface{}, s string) string {
 	buf := bytes.NewBufferString("")
 	t.Execute(buf, p)
 	value := buf.String()
-	if value == "%!s(<nil>)" {
+	if value == "%!s(<nil>)" || value == "<no value>" {
 		value = ""
 	}
 
 	return value
-
-	/*
-	   	//-- Match $variables from String
-	   	re1, err := regexp.Compile(`\[(.*?)\]`)
-	   	if err != nil {
-	   		logger(4, "Regex Error: "+fmt.Sprintf("%v", err), false)
-	   		return ""
-	   	}
-	   	//-- Get Array of all Matched max 100
-	   	result := re1.FindAllString(s, 100)
-
-	   	//-- Loop Matches
-	   	for _, v := range result {
-	   		//-- Grab DB Mapping value from result set
-	   //		var DBAttributeValue = u.GetAttributeValue(v[1 : len(v)-1])
-	   fmt.Println(v)
-	   		var DBAttributeValue = "aa" //u[GetAttributeValue(v[1 : len(v)-1])
-	   		//-- Check for Invalid Value
-	   		if DBAttributeValue == "" {
-	   			//logger(3, "Unable to Load DB Attribute: "+v[1:len(v)-1]+" For Input Param: "+s, false)
-	   			return DBAttributeValue
-	   		}
-	   		//-- TK UnescapeString to HTML entities are replaced
-	   		s = html.UnescapeString(strings.Replace(s, v, DBAttributeValue, 1))
-
-	   		//-- TK Remote Any White space leading and trailing a string
-	   		s = strings.TrimSpace(s)
-	   	}
-
-	   	//-- Return Value
-	   	return s
-	*/
 }
 
 //-- Match Any value wrapped in {} and get its Import Action Value
@@ -139,14 +101,14 @@ func processImportAction(u map[string]string, s string) string {
 
 	//-- Loop Matches
 	for _, v := range result {
-		//-- Grab DB Mapping value from result set
-		var DBAttributeValue = u[v]
+		//-- Grab Azure Mapping value from result set
+		var AzureAttributeValue = u[v]
 		//-- Check for Invalid Value
-		if DBAttributeValue == "" {
-			return DBAttributeValue
+		if AzureAttributeValue == "" {
+			return AzureAttributeValue
 		}
 		//-- TK UnescapeString to HTML entities are replaced
-		s = html.UnescapeString(strings.Replace(s, v, DBAttributeValue, 1))
+		s = html.UnescapeString(strings.Replace(s, v, AzureAttributeValue, 1))
 
 		//-- TK Remote Any White space leading and trailing a string
 		s = strings.TrimSpace(s)
@@ -193,7 +155,7 @@ func generatePasswordString(importData *userWorkingDataStruct) string {
 
 func loggerGen(t int, s string) string {
 	//-- Ignore Logging level unless is 0
-	if t < AzureImportConf.Advanced.LogLevel && t != 0 {
+	if t < azureImportConf.Advanced.LogLevel && t != 0 {
 		return ""
 	}
 
@@ -223,10 +185,10 @@ func loggerWriteBuffer(s string) {
 }
 func deletefiles(path string, f os.FileInfo, err error) (e error) {
 	var cutoff = (24 * time.Hour)
-	cutoff = time.Duration(AzureImportConf.Advanced.LogRetention) * cutoff
+	cutoff = time.Duration(azureImportConf.Advanced.LogRetention) * cutoff
 	now := time.Now()
 	// check each file if starts with prefix and our log name so other log files are not deleted and different imports can have differnt retentions
-	if strings.HasPrefix(f.Name(), Flags.configLogPrefix+"DB_User_Import_") {
+	if strings.HasPrefix(f.Name(), Flags.configLogPrefix+"Azure_User_Import_") {
 
 		if diff := now.Sub(f.ModTime()); diff > cutoff {
 			logger(1, "Removing Old Log File: "+path, false)
@@ -239,9 +201,9 @@ func deletefiles(path string, f os.FileInfo, err error) (e error) {
 }
 
 func runLogRetentionCheck() {
-	logger(1, "Processing Old Log Files Current Retention Set to: "+fmt.Sprintf("%d", AzureImportConf.Advanced.LogRetention), true)
+	logger(1, "Processing Old Log Files Current Retention Set to: "+fmt.Sprintf("%d", azureImportConf.Advanced.LogRetention), true)
 
-	if AzureImportConf.Advanced.LogRetention > 0 {
+	if azureImportConf.Advanced.LogRetention > 0 {
 		//-- Curreny WD
 		cwd, _ := os.Getwd()
 		//-- Log Folder
@@ -257,7 +219,7 @@ func runLogRetentionCheck() {
 func logger(t int, s string, outputtoCLI bool) {
 
 	//-- Ignore Logging level unless is 0
-	if t < AzureImportConf.Advanced.LogLevel && t != 0 {
+	if t < azureImportConf.Advanced.LogLevel && t != 0 {
 		return
 	}
 	mutexLog.Lock()
@@ -269,7 +231,7 @@ func logger(t int, s string, outputtoCLI bool) {
 		//-- Log Folder
 		logPath := cwd + "/log"
 		//-- Log File
-		logFileName := logPath + "/" + Flags.configLogPrefix + "DB_User_Import_" + Time.timeNow + ".log"
+		logFileName := logPath + "/" + Flags.configLogPrefix + "Azure_User_Import_" + Time.timeNow + ".log"
 		//-- If Folder Does Not Exist then create it
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
 			err := os.Mkdir(logPath, 0777)
@@ -365,7 +327,7 @@ func completeImportHistory() bool {
 
 	strMessage := ""
 
-	strMessage += "=== XMLMC DB Import Utility V" + fmt.Sprintf("%v", version) + " ===\n\n"
+	strMessage += "=== Azure User Import Utility V" + fmt.Sprintf("%v", version) + " ===\n\n"
 	strMessage += "'''Errors''': " + fmt.Sprintf("%d", counters.errors) + "\n"
 
 	strMessage += "'''Accounts Proccesed''': " + fmt.Sprintf("%d", len(HornbillCache.UsersWorking)) + "\n"
@@ -458,18 +420,6 @@ func getLastHistory() {
 	}
 
 }
-
-/*
-func getInstanceURL() string {
-	xmlmcInstanceConfig.url = "https://"
-	xmlmcInstanceConfig.url += xmlmcInstanceConfig.zone
-	xmlmcInstanceConfig.url += "api.hornbill.com/"
-	xmlmcInstanceConfig.url += xmlmcInstanceConfig.instance
-	xmlmcInstanceConfig.davurl = xmlmcInstanceConfig.url + "/dav/"
-	xmlmcInstanceConfig.url += "/xmlmc/"
-	return xmlmcInstanceConfig.url
-}
-*/
 
 func getServerBuild() {
 	loggerAPI = apiLib.NewXmlmcInstance(Flags.configInstanceID)

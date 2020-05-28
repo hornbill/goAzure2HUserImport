@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2.5.0 (May 28th, 2020)
+
+Fix:
+
+- Re-added support to define additional fields to return from Azure and map into Hornbill user fields and groups
+- Fixed issue with group memberships not applying
+- Fixed issue with Home Organisation only being set on user record update
+- Re-added SetAsHomeOrganisation back into default conf.json
+- Fixed issues with profile attributes only being set on user record update
+- Fixed issues with site not always being imported
+- Fixed issues with incorrect errors being reported
+- Fixed issues with badly handled nil values
+- Fixed issues with manager records not always being imported 
+- Tidied up code & removed references to other tools whose code were used to build this one
+
 ## 2.4.2 (May 14th, 2020)
 
 Fix:

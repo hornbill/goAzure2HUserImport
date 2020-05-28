@@ -2,32 +2,33 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 )
 
 func getManager(importData *userWorkingDataStruct, currentData userAccountStruct) string {
 	//-- Check if Manager Attribute is set
-	if AzureImportConf.User.Manager.Value == "" {
+	if azureImportConf.User.Manager.Value == "" {
 		logger(4, "Manager Lookup is Enabled but Attribute is not Defined", false)
 		return ""
 	}
 
 	//-- Get Value of Attribute
-	logger(1, "DB Attribute for Manager Lookup: "+AzureImportConf.User.Manager.Value, false)
+	logger(1, "Azure Attribute for Manager Lookup: "+azureImportConf.User.Manager.Value, false)
 
 	//-- Get Value of Attribute
-	ManagerAttributeName := processComplexField(importData.DB, AzureImportConf.User.Manager.Value)
+	ManagerAttributeName := processComplexField(importData.DB, azureImportConf.User.Manager.Value)
 	ManagerAttributeName = processImportAction(importData.Custom, ManagerAttributeName)
 
-	if AzureImportConf.User.Manager.Options.MatchAgainstDistinguishedName {
+	if azureImportConf.User.Manager.Options.MatchAgainstDistinguishedName {
 		logger(1, "Searching Distinguished Name Cache for: "+ManagerAttributeName, false)
 		managerID := getUserFromDNCache(ManagerAttributeName)
 		if managerID != "" {
 			logger(1, "Found Manager in Distinguished Name  Cache: "+managerID, false)
 			return managerID
 		}
-		logger(1, "Unable to find Manager in Distinguished Name  Cache Coninuing search", false)
+		logger(1, "Unable to find Manager in Distinguished Name  Cache Continuing search", false)
 	}
 
 	//-- Dont Continue if we didn't get anything
@@ -35,19 +36,19 @@ func getManager(importData *userWorkingDataStruct, currentData userAccountStruct
 		return ""
 	}
 
-	//-- Pull Data from Attriute using regext
-	if AzureImportConf.User.Manager.Options.GetStringFromValue.Regex != "" {
-		logger(1, "DB Manager String: "+ManagerAttributeName, false)
-		ManagerAttributeName = getNameFromDBString(ManagerAttributeName)
+	//-- Pull Data from Attribute using regext
+	if azureImportConf.User.Manager.Options.GetStringFromValue.Regex != "" {
+		logger(1, "Azure Manager String: "+ManagerAttributeName, false)
+		ManagerAttributeName = getNameFromAzureString(ManagerAttributeName)
 	}
 	//-- Is Search Enabled
-	if AzureImportConf.User.Manager.Options.Search.Enable {
+	if azureImportConf.User.Manager.Options.Search.Enable {
 		logger(1, "Search for Manager is Enabled", false)
 
 		logger(1, "Looking Up Manager from Cache: "+ManagerAttributeName, false)
 		managerIsInCache, ManagerIDCache := managerInCache(ManagerAttributeName)
 
-		//-- Check if we have Chached the site already
+		//-- Check if we have Cached the users manager already
 		if managerIsInCache {
 			logger(1, "Found Manager in Cache: "+ManagerIDCache, false)
 			return ManagerIDCache
@@ -59,6 +60,7 @@ func getManager(importData *userWorkingDataStruct, currentData userAccountStruct
 			logger(1, "Manager Lookup found Id: "+ManagerIDInstance, false)
 			return ManagerIDInstance
 		}
+		logger(1, "Manager Not Found: "+ManagerAttributeName, false)
 	} else {
 		logger(1, "Search for Manager is Disabled", false)
 		//-- Assume data is manager id
@@ -77,23 +79,28 @@ func searchManager(managerName string) (bool, string) {
 		return false, ""
 	}
 
-	//-- Add support for Search Feild configuration
+	//-- Add support for Search Field configuration
 	strSearchField := "h_name"
-	if AzureImportConf.User.Manager.Options.Search.SearchField != "" {
-		strSearchField = AzureImportConf.User.Manager.Options.Search.SearchField
+	if azureImportConf.User.Manager.Options.Search.SearchField != "" {
+		strSearchField = azureImportConf.User.Manager.Options.Search.SearchField
 	}
 
 	logger(1, "Manager Search: "+strSearchField+" - "+managerName, false)
 
 	//-- Check User Cache for Manager
 	for _, v := range HornbillCache.Users {
-		if strings.EqualFold(v.HName, managerName) {
-			//-- If not already in cache push to cache
-			_, found := HornbillCache.Managers[strings.ToLower(managerName)]
-			if !found {
-				HornbillCache.Managers[strings.ToLower(managerName)] = v.HUserID
+
+		user := reflect.ValueOf(v)
+		typeOfUser := user.Type()
+
+		for i := 0; i < user.NumField(); i++ {
+			if typeOfUser.Field(i).Name == "HUserID" && strings.EqualFold(managerName, fmt.Sprint(user.Field(i).Interface())) {
+				_, found := HornbillCache.Managers[strings.ToLower(managerName)]
+				if !found {
+					HornbillCache.Managers[strings.ToLower(managerName)] = v.HUserID
+				}
+				return true, v.HUserID
 			}
-			return true, v.HUserID
 		}
 	}
 
@@ -110,11 +117,11 @@ func managerInCache(managerName string) (bool, string) {
 	return false, ""
 }
 
-//-- Takes a string based on a DB DN and returns to the CN String Name
-func getNameFromDBString(feild string) string {
+//-- Takes a string based on a Azure DN and returns to the CN String Name
+func getNameFromAzureString(feild string) string {
 
-	regex := AzureImportConf.User.Manager.Options.GetStringFromValue.Regex
-	reverse := AzureImportConf.User.Manager.Options.GetStringFromValue.Reverse
+	regex := azureImportConf.User.Manager.Options.GetStringFromValue.Regex
+	reverse := azureImportConf.User.Manager.Options.GetStringFromValue.Reverse
 	stringReturn := ""
 
 	//-- Match $variables from String
@@ -128,7 +135,7 @@ func getNameFromDBString(feild string) string {
 
 	//-- Loop Matches
 	for _, v := range result {
-		//-- String DB String Chars Out from match
+		//-- String Azure String Chars Out from match
 		v = strings.Replace(v, "CN=", "", -1)
 		v = strings.Replace(v, "OU=", "", -1)
 		v = strings.Replace(v, "DC=", "", -1)

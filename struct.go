@@ -6,8 +6,8 @@ import (
 )
 
 //----- Constants -----
-const version = "2.4.2"
-const app_name = "goAzure2HUserImport"
+const version = "2.5.0"
+const appName = "goAzure2HUserImport"
 const apiResource = "https://graph.microsoft.com"
 const employeeIDMinServerBuild = 3241
 
@@ -21,7 +21,7 @@ var globalBearerToken = ""
 var globalTokenExpiry int64
 var strAzurePagerToken = ""
 
-var localDBUsers []map[string]interface{}
+var localAzureUsers []map[string]interface{}
 
 //Password profiles
 var passwordProfile passwordProfileStruct
@@ -144,10 +144,9 @@ var Time struct {
 }
 
 //----- Variables -----
-var AzureImportConf AzureImportConfStruct
-var ldapServerAuth ldapServerConfAuthStruct
 
-//var ldapUsers []*ldap.Entry
+var azureImportConf azureImportConfStruct
+
 var counters struct {
 	errors         uint16
 	updated        uint16
@@ -164,33 +163,13 @@ var counters struct {
 	traffic uint64
 }
 
-//----- Structures -----
-type ldapServerConfAuthStruct struct {
-	Host     string
-	UserName string
-	Password string
-	Port     uint16
-}
-type ldapServerConfStruct struct {
-	KeySafeID          int
-	ConnectionType     string
-	InsecureSkipVerify bool
-	Scope              int
-	DerefAliases       int
-	SizeLimit          int
-	TimeLimit          int
-	TypesOnly          bool
-	Filter             string
-	DSN                string
-	Debug              bool
-}
-
-type sqlConfStruct struct {
+type azureConfStruct struct {
 	Tenant         string
 	ClientID       string
 	ClientSecret   string
 	UserFilter     string
 	UserID         string
+	UserProperties []string
 	Debug          bool
 	APIVersion     string
 	Search         string
@@ -202,10 +181,10 @@ type groupConfStruct struct {
 	Name     string
 }
 
-type AzureImportConfStruct struct {
+type azureImportConfStruct struct {
 	APIKey     string `json:"APIKey"`
 	InstanceID string `json:"InstanceId"`
-	AzureConf  sqlConfStruct
+	AzureConf  azureConfStruct
 	User       struct {
 		AccountMapping AccountMappingStruct `json:"AccountMapping"`
 		UserDN         string               `json:"UserDN"`

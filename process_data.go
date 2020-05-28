@@ -7,56 +7,30 @@ import (
 	"strings"
 )
 
-//-- Store DB Users in Map
-func processDBUsers() {
-	logger(1, "Processing DB User Data", true)
+//-- Store Azure Users in Map
+func processAzureUsers() {
+	logger(1, "Processing Azure User Data", true)
 
 	//-- User Working Data
 	HornbillCache.UsersWorking = make(map[string]*userWorkingDataStruct)
 	HornbillCache.Managers = make(map[string]string)
 	HornbillCache.DN = make(map[string]string)
 	HornbillCache.Images = make(map[string]imageStruct)
-	//-- Loop DB Users
-	for user := range localDBUsers {
+	//-- Loop Azure Users
+	for user := range localAzureUsers {
 		// Process Pre Import Actions
-		var userID = processImportActions(&localDBUsers[user])
+		var userID = processImportActions(&localAzureUsers[user])
 		// Process Params and return userId
-		processUserParams(&localDBUsers[user], userID)
+		processUserParams(&localAzureUsers[user], userID)
 		if userID != "" {
-			var userDN = processComplexField(&localDBUsers[user], AzureImportConf.User.UserDN)
+			var userDN = processComplexField(&localAzureUsers[user], azureImportConf.User.UserDN)
 			//-- Write to Cache
 			writeUserToCache(userDN, userID)
 		}
 	}
 
-	logger(1, "DB Users Processed: "+fmt.Sprintf("%d", len(localDBUsers))+"\n", true)
+	logger(1, "Azure Users Processed: "+fmt.Sprintf("%d", len(localAzureUsers))+"\n", true)
 }
-
-/*
-func processDBUsers() {
-	logger(1, "Processing DB User Data", true)
-
-	//-- User Working Data
-	HornbillCache.UsersWorking = make(map[string]*userWorkingDataStruct)
-	HornbillCache.Managers = make(map[string]string)
-	HornbillCache.DN = make(map[string]string)
-	HornbillCache.Images = make(map[string]imageStruct)
-	//-- Loop DB Users
-	for user := range ldapUsers {
-		// Process Pre Import Actions
-		var userID = processImportActions(ldapUsers[user])
-		// Process Params and return userId
-		processUserParams(ldapUsers[user], userID)
-		if userID != "" {
-			var userDN = processComplexField(ldapUsers[user], AzureImportConf.User.UserDN)
-			//-- Write to Cache
-			writeUserToCache(userDN, userID)
-		}
-	}
-
-	logger(1, "DB Users Processed: "+fmt.Sprintf("%d", len(ldapUsers))+"\n", true)
-}
-*/
 
 func processData() {
 	logger(1, "Processing User Data", true)
@@ -68,13 +42,13 @@ func processData() {
 		userID := strings.ToLower(currentUser.Account.UserID)
 
 		//-- Extra Debugging
-		logger(1, "DB User ID: '"+userID+"'\n", false)
+		logger(1, "Azure User ID: '"+userID+"'\n", false)
 
 		hornbillUserData := HornbillCache.Users[userID]
 
 		if userID == "" {
 			CounterInc(7)
-			logger(4, "DB Record Has no User ID: '"+fmt.Sprintf("%+v", currentUser.DB)+"'\n", false)
+			logger(4, "Azure Record Has no User ID: '"+fmt.Sprintf("%+v", currentUser.DB)+"'\n", false)
 			continue
 		}
 		//-- Check Map no need to loop
@@ -108,6 +82,8 @@ func processData() {
 			currentUser.Jobs.updateImage = checkUserNeedsImageCreate(currentUser, hornbillUserData)
 			checkUserNeedsOrgCreate(currentUser, hornbillUserData)
 			currentUser.Jobs.updateStatus = checkUserNeedsStatusCreate(currentUser, hornbillUserData)
+			currentUser.Jobs.updateHomeOrg = checkUserNeedsHomeOrgCreate(currentUser, hornbillUserData)
+			currentUser.Jobs.updateProfile = checkUserNeedsProfileUpdate(currentUser, hornbillUserData)
 			currentUser.Jobs.create = true
 		}
 
@@ -132,9 +108,9 @@ func processData() {
 
 func checkUserNeedsStatusCreate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 
-	if AzureImportConf.User.Role.Action == "Both" || AzureImportConf.User.Role.Action == "Create" {
+	if azureImportConf.User.Role.Action == "Both" || azureImportConf.User.Role.Action == "Create" {
 		//-- By default they are created active so if we need to change the status it should be done if not active
-		if AzureImportConf.User.Status.Value != "active" {
+		if azureImportConf.User.Status.Value != "active" {
 			return true
 		}
 	}
@@ -143,9 +119,9 @@ func checkUserNeedsStatusCreate(importData *userWorkingDataStruct, currentData u
 }
 func checkUserNeedsStatusUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 
-	if AzureImportConf.User.Status.Action == "Both" || AzureImportConf.User.Status.Action == "Update" {
+	if azureImportConf.User.Status.Action == "Both" || azureImportConf.User.Status.Action == "Update" {
 		//-- Check current status != config status
-		if HornbillUserStatusMap[currentData.HAccountStatus] != AzureImportConf.User.Status.Value {
+		if HornbillUserStatusMap[currentData.HAccountStatus] != azureImportConf.User.Status.Value {
 			return true
 		}
 	}
@@ -162,7 +138,7 @@ func setUserPasswordValueForCreate(importData *userWorkingDataStruct) {
 }
 func checkUserNeedsOrgRemoving(importData *userWorkingDataStruct, currentData userAccountStruct) {
 	//-- Only if we have some config for groups
-	if len(AzureImportConf.User.Org) > 0 {
+	if len(azureImportConf.User.Org) > 0 {
 
 		//-- List of Existing Groups
 		var userExistingGroups = HornbillCache.UserGroups[strings.ToLower(importData.Account.UserID)]
@@ -173,10 +149,10 @@ func checkUserNeedsOrgRemoving(importData *userWorkingDataStruct, currentData us
 			boolGroupNeedsRemoving := false
 
 			//-- Loop Config Orgs and Check each one
-			for orgIndex := range AzureImportConf.User.Org {
+			for orgIndex := range azureImportConf.User.Org {
 
 				//-- Get Group from Index
-				importOrg := AzureImportConf.User.Org[orgIndex]
+				importOrg := azureImportConf.User.Org[orgIndex]
 
 				//-- Only if Actions is correct
 				if importOrg.Action == "Both" || importOrg.Action == "Update" {
@@ -203,9 +179,9 @@ func checkUserNeedsOrgRemoving(importData *userWorkingDataStruct, currentData us
 }
 
 func checkUserNeedsOrgUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) {
-	if len(AzureImportConf.User.Org) > 0 {
-		for orgIndex := range AzureImportConf.User.Org {
-			orgAction := AzureImportConf.User.Org[orgIndex]
+	if len(azureImportConf.User.Org) > 0 {
+		for orgIndex := range azureImportConf.User.Org {
+			orgAction := azureImportConf.User.Org[orgIndex]
 			if orgAction.Action == "Both" || orgAction.Action == "Update" {
 				var GroupID = getOrgFromLookup(importData, orgAction.Value, orgAction.Options.Type)
 				var userExistingGroups = HornbillCache.UserGroups[strings.ToLower(importData.Account.UserID)]
@@ -216,13 +192,8 @@ func checkUserNeedsOrgUpdate(importData *userWorkingDataStruct, currentData user
 						boolUserInGroup = true
 					}
 				}
+
 				if !boolUserInGroup && GroupID != "" {
-					//-- Check User is a member of
-					if orgAction.MemberOf != "" {
-						if !isUserAMember(importData.DB, orgAction.MemberOf) {
-							continue
-						}
-					}
 					var group userGroupStruct
 					group.ID = GroupID
 					group.Name = orgAction.Value
@@ -240,13 +211,35 @@ func checkUserNeedsOrgUpdate(importData *userWorkingDataStruct, currentData user
 }
 
 func checkUserNeedsHomeOrgUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
-	if len(AzureImportConf.User.Org) > 0 {
-		for orgIndex := range AzureImportConf.User.Org {
-			orgAction := AzureImportConf.User.Org[orgIndex]
+	if len(azureImportConf.User.Org) > 0 {
+		for orgIndex := range azureImportConf.User.Org {
+			orgAction := azureImportConf.User.Org[orgIndex]
 			if !orgAction.Options.SetAsHomeOrganisation {
 				continue
 			}
-			if orgAction.Action == "Create" || orgAction.Action == "Both" || orgAction.Action == "Update" {
+			if orgAction.Action == "Both" || orgAction.Action == "Update" {
+				var GroupID = getOrgFromLookup(importData, orgAction.Value, orgAction.Options.Type)
+
+				if GroupID == "" || strings.EqualFold(currentData.HHomeOrg, GroupID) {
+					return false
+				}
+				importData.Account.HomeOrg = GroupID
+				logger(1, "Home Organisation: "+GroupID+" - "+currentData.HHomeOrg, true)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func checkUserNeedsHomeOrgCreate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
+	if len(azureImportConf.User.Org) > 0 {
+		for orgIndex := range azureImportConf.User.Org {
+			orgAction := azureImportConf.User.Org[orgIndex]
+			if !orgAction.Options.SetAsHomeOrganisation {
+				continue
+			}
+			if orgAction.Action == "Create" || orgAction.Action == "Both" {
 				var GroupID = getOrgFromLookup(importData, orgAction.Value, orgAction.Options.Type)
 
 				if GroupID == "" || strings.EqualFold(currentData.HHomeOrg, GroupID) {
@@ -262,18 +255,12 @@ func checkUserNeedsHomeOrgUpdate(importData *userWorkingDataStruct, currentData 
 }
 
 func checkUserNeedsOrgCreate(importData *userWorkingDataStruct, currentData userAccountStruct) {
-	if len(AzureImportConf.User.Org) > 0 {
-		for orgIndex := range AzureImportConf.User.Org {
-			orgAction := AzureImportConf.User.Org[orgIndex]
+	if len(azureImportConf.User.Org) > 0 {
+		for orgIndex := range azureImportConf.User.Org {
+			orgAction := azureImportConf.User.Org[orgIndex]
 			if orgAction.Action == "Both" || orgAction.Action == "Create" {
 
 				var GroupID = getOrgFromLookup(importData, orgAction.Value, orgAction.Options.Type)
-
-				if GroupID != "" && orgAction.MemberOf != "" {
-					if !isUserAMember(importData.DB, orgAction.MemberOf) {
-						continue
-					}
-				}
 				var group userGroupStruct
 				group.ID = GroupID
 				group.Name = orgAction.Value
@@ -292,15 +279,15 @@ func checkUserNeedsOrgCreate(importData *userWorkingDataStruct, currentData user
 }
 func setUserRolesalueForCreate(importData *userWorkingDataStruct, currentData userAccountStruct) {
 
-	if AzureImportConf.User.Role.Action == "Both" || AzureImportConf.User.Role.Action == "Create" {
-		importData.Roles = AzureImportConf.User.Role.Roles
+	if azureImportConf.User.Role.Action == "Both" || azureImportConf.User.Role.Action == "Create" {
+		importData.Roles = azureImportConf.User.Role.Roles
 	}
 }
 func checkUserNeedsRoleUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) {
 
-	if AzureImportConf.User.Role.Action == "Both" || AzureImportConf.User.Role.Action == "Update" {
-		for index := range AzureImportConf.User.Role.Roles {
-			roleName := AzureImportConf.User.Role.Roles[index]
+	if azureImportConf.User.Role.Action == "Both" || azureImportConf.User.Role.Action == "Update" {
+		for index := range azureImportConf.User.Role.Roles {
+			roleName := azureImportConf.User.Role.Roles[index]
 			foundRole := false
 			var userRoles = HornbillCache.UserRoles[strings.ToLower(importData.Account.UserID)]
 			for index2 := range userRoles {
@@ -316,10 +303,10 @@ func checkUserNeedsRoleUpdate(importData *userWorkingDataStruct, currentData use
 }
 func checkUserNeedsImageCreate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 	//-- Is Type Enables for Update or both
-	if AzureImportConf.User.Image.Action == "Both" || AzureImportConf.User.Image.Action == "Create" {
+	if azureImportConf.User.Image.Action == "Both" || azureImportConf.User.Image.Action == "Create" {
 
 		//-- Check for Empty URI
-		if AzureImportConf.User.Image.URI == "" {
+		if azureImportConf.User.Image.URI == "" {
 			return false
 		}
 		image := getImage(importData)
@@ -332,10 +319,10 @@ func checkUserNeedsImageCreate(importData *userWorkingDataStruct, currentData us
 }
 func checkUserNeedsImageUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 	//-- Is Type Enables for Update or both
-	if AzureImportConf.User.Image.Action == "Both" || AzureImportConf.User.Image.Action == "Update" {
+	if azureImportConf.User.Image.Action == "Both" || azureImportConf.User.Image.Action == "Update" {
 
 		//-- Check for Empty URI
-		if AzureImportConf.User.Image.URI == "" {
+		if azureImportConf.User.Image.URI == "" {
 			return false
 		}
 		image := getImage(importData)
@@ -348,7 +335,7 @@ func checkUserNeedsImageUpdate(importData *userWorkingDataStruct, currentData us
 }
 func checkUserNeedsTypeUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 	//-- Is Type Enables for Update or both
-	if AzureImportConf.User.Type.Action == "Both" || AzureImportConf.User.Type.Action == "Update" {
+	if azureImportConf.User.Type.Action == "Both" || azureImportConf.User.Type.Action == "Update" {
 		// -- 1 = user
 		// -- 3 = basic
 		switch importData.Account.UserType {
@@ -374,7 +361,7 @@ func checkUserNeedsTypeUpdate(importData *userWorkingDataStruct, currentData use
 }
 func setUserSiteValueForCreate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 	//-- Is Site Enables for Update or both
-	if AzureImportConf.User.Site.Action == "Both" || AzureImportConf.User.Site.Action == "Create" {
+	if azureImportConf.User.Site.Action == "Both" || azureImportConf.User.Site.Action == "Create" {
 		importData.Account.Site = getSiteFromLookup(importData)
 	}
 	if importData.Account.Site != "" && importData.Account.Site != currentData.HSite {
@@ -384,7 +371,7 @@ func setUserSiteValueForCreate(importData *userWorkingDataStruct, currentData us
 }
 func checkUserNeedsSiteUpdate(importData *userWorkingDataStruct, currentData userAccountStruct) bool {
 	//-- Is Site Enables for Update or both
-	if AzureImportConf.User.Site.Action == "Both" || AzureImportConf.User.Site.Action == "Update" {
+	if azureImportConf.User.Site.Action == "Both" || azureImportConf.User.Site.Action == "Update" {
 		importData.Account.Site = getSiteFromLookup(importData)
 	} else {
 		//-- Else Default to current value
@@ -486,7 +473,7 @@ func checkUserNeedsProfileUpdate(importData *userWorkingDataStruct, currentData 
 		logger(1, "JobDescription: "+importData.Profile.JobDescription+" - "+currentData.HSummary, true)
 		return true
 	}
-	if AzureImportConf.User.Manager.Action == "Both" || AzureImportConf.User.Manager.Action == "Update" {
+	if azureImportConf.User.Manager.Action == "Both" || azureImportConf.User.Manager.Action == "Update" {
 		importData.Profile.Manager = getManager(importData, currentData)
 	} else {
 		//-- Use Current Value
@@ -612,7 +599,6 @@ func checkUserNeedsProfileUpdate(importData *userWorkingDataStruct, currentData 
 }
 
 //-- For Each Import Actions process the data
-//func processImportActions(l *ldap.Entry) string {
 func processImportActions(l *map[string]interface{}) string {
 
 	//-- Set User Account Attributes
@@ -624,10 +610,10 @@ func processImportActions(l *map[string]interface{}) string {
 
 	logger(1, "Post Import Actions for: "+data.Account.UserID, false)
 	//-- Loop Matches
-	for _, action := range AzureImportConf.Actions {
+	for _, action := range azureImportConf.Actions {
 		switch action.Action {
 		case "Regex":
-			//-- Grab value from DB
+			//-- Grab value from Azure
 			Outcome := processComplexField(l, action.Value)
 			//-- Grab Value from Existing Custom Feild
 			Outcome = processImportAction(data.Custom, Outcome)
@@ -638,7 +624,7 @@ func processImportActions(l *map[string]interface{}) string {
 
 			logger(1, "Regex Output: "+Outcome, false)
 		case "Replace":
-			//-- Grab value from DB
+			//-- Grab value from Azure
 			Outcome := processComplexField(l, action.Value)
 			//-- Grab Value from Existing Custom Feild
 			Outcome = processImportAction(data.Custom, Outcome)
@@ -649,7 +635,7 @@ func processImportActions(l *map[string]interface{}) string {
 
 			logger(1, "Replace Output: "+Outcome, false)
 		case "Trim":
-			//-- Grab value from DB
+			//-- Grab value from Azure
 			Outcome := processComplexField(l, action.Value)
 			//-- Grab Value from Existing Custom Feild
 			Outcome = processImportAction(data.Custom, Outcome)
@@ -682,8 +668,7 @@ func processImportActions(l *map[string]interface{}) string {
 	return userID
 }
 
-//-- For Each DB User Process Account And Mappings
-//func processUserParams(l *ldap.Entry, userID string) {
+//-- For Each Azure User Process Account And Mappings
 func processUserParams(l *map[string]interface{}, userID string) {
 
 	data := HornbillCache.UsersWorking[userID]

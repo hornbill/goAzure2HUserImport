@@ -15,9 +15,6 @@ import (
 	//-- CLI Colour
 	"github.com/hornbill/color"
 
-	//-- Hornbill Clone of "github.com/mavricknz/ldap"
-	//--Hornbil Clone of "github.com/cheggaaa/pb"
-
 	apiLib "github.com/hornbill/goApiLib"
 	"github.com/tcnksm/go-latest" //-- For Version checking
 )
@@ -51,7 +48,7 @@ func main() {
 	checkVersion()
 
 	//-- Load Configuration File Into Struct
-	AzureImportConf = loadConfig()
+	azureImportConf = loadConfig()
 
 	//-- Validation on Configuration File
 	configError := validateConf()
@@ -64,11 +61,11 @@ func main() {
 	}
 
 	if Flags.configInstanceID == "" {
-		Flags.configInstanceID = AzureImportConf.InstanceID
+		Flags.configInstanceID = azureImportConf.InstanceID
 	}
 
 	if Flags.configAPIKey == "" {
-		Flags.configAPIKey = AzureImportConf.APIKey
+		Flags.configAPIKey = azureImportConf.APIKey
 	}
 
 	//-- Check import not already running
@@ -88,16 +85,16 @@ func main() {
 	//-- Get Password Profile
 	getPasswordProfile()
 
-	//-- Query DB
-	if AzureImportConf.AzureConf.Search == "users" {
+	//-- Query Azure
+	if azureImportConf.AzureConf.Search == "users" {
 		//Get users, process accordingly
-		logger(2, "Querying Users with filter ["+AzureImportConf.AzureConf.UserFilter+"]", true)
+		logger(2, "Querying Users with filter ["+azureImportConf.AzureConf.UserFilter+"]", true)
 		for ok := true; ok; ok = (strAzurePagerToken != "") { // do {...} while
 			queryAzure()
 		}
 	}
-	if AzureImportConf.AzureConf.Search == "groups" {
-		for _, group := range AzureImportConf.AzureConf.UsersByGroupID {
+	if azureImportConf.AzureConf.Search == "groups" {
+		for _, group := range azureImportConf.AzureConf.UsersByGroupID {
 			//Get users, process accordingly
 			logger(2, "Querying Group ["+group.Name+"]", true)
 
@@ -107,43 +104,39 @@ func main() {
 		}
 	}
 
-//	if len(localDBUsers)>0 {
+	//-- Process Azure User Data First
+	//-- So we only store data about users we have
+	processAzureUsers()
 
-		//-- Process DB User Data First
-		//-- So we only store data about users we have
-		processDBUsers()
+	//-- Fetch Users from Hornbill
+	loadUsers()
 
-		//-- Fetch Users from Hornbill
-		loadUsers()
+	//-- Load User Roles
+	loadUsersRoles()
 
-		//-- Load User Roles
-		loadUsersRoles()
+	//-- Fetch Sites
+	loadSites()
 
-		//-- Fetch Sites
-		loadSites()
+	//-- Fetch Groups
+	loadGroups()
 
-		//-- Fetch Groups
-		loadGroups()
+	//-- Fetch User Groups
+	loadUserGroups()
 
-		//-- Fetch User Groups
-		loadUserGroups()
+	//-- Create List of Actions that need to happen
+	//-- (Create,Update,profileUpdate,Assign Role, Assign Group, Assign Site)
+	processData()
 
-		//-- Create List of Actions that need to happen
-		//-- (Create,Update,profileUpdate,Assign Role, Assign Group, Assign Site)
-		processData()
+	//-- Run Actions
+	finaliseData()
 
-		//-- Run Actions
-		finaliseData()
-//	} else {
-//		logger(2, "No Source Data to Process", true)
-//	}
 	//-- End Ouput
 	outputEnd()
 }
 
 func outputFlags() {
 	//-- Output
-	logger(1, "---- XMLMC SQL Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
+	logger(1, "---- Hornbill Azure User Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
 
 	logger(1, "Flag - Config File "+Flags.configFileName, true)
 	logger(1, "Flag - Zone "+Flags.configZone, true)
@@ -167,7 +160,7 @@ func procFlags() {
 
 	//-- Parse Flags
 	flag.Parse()
-	Flags.configID = app_name
+	Flags.configID = appName
 	//-- Output config
 	if !Flags.configVersion {
 		outputFlags()
@@ -190,7 +183,7 @@ func procFlags() {
 
 	//-- Output config
 	if !Flags.configVersion {
-		logger(2, "---- XMLMC DB User Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
+		logger(2, "---- Azure Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
 		logger(2, "Flag - config "+Flags.configID, true)
 		logger(2, "Flag - logprefix "+Flags.configLogPrefix, true)
 		logger(2, "Flag - dryrun "+fmt.Sprintf("%v", Flags.configDryRun), true)
@@ -207,11 +200,10 @@ func outputEnd() {
 	logger(2, "Import Complete", true)
 	//-- End output
 	if counters.errors > 0 {
-		logger(4, "One or more errors encountered please check the log file", true)
+		logger(4, "One or more errors encountered, please check the log file", true)
 		logger(4, "Error Count: "+fmt.Sprintf("%d", counters.errors), true)
-		//logger(4, "Check Log File for Details", true)
 	}
-	logger(2, "Accounts Procesed: "+fmt.Sprintf("%d", len(HornbillCache.UsersWorking)), true)
+	logger(2, "Accounts Processed: "+fmt.Sprintf("%d", len(HornbillCache.UsersWorking)), true)
 	logger(2, "Created: "+fmt.Sprintf("%d", counters.created), true)
 	logger(2, "Updated: "+fmt.Sprintf("%d", counters.updated), true)
 
@@ -236,14 +228,14 @@ func outputEnd() {
 	logger(2, "Total Traffic: "+fmt.Sprintf("%d", counters.traffic), true)
 
 	completeImportHistory()
-	logger(2, "---- XMLMC DB Import Complete ---- ", true)
+	logger(2, "---- Azure User Import Complete ---- ", true)
 }
 
 //-- Check Latest
 func checkVersion() {
 	githubTag := &latest.GithubTag{
 		Owner:      "hornbill",
-		Repository: app_name,
+		Repository: appName,
 	}
 
 	res, err := latest.Check(githubTag, version)
@@ -252,11 +244,11 @@ func checkVersion() {
 		return
 	}
 	if res.Outdated {
-		logger(3, version+" is not latest, you should upgrade to "+res.Current+" by downloading the latest package Here https://github.com/hornbill/"+app_name+"/releases/tag/v"+res.Current, true)
+		logger(3, version+" is not latest, you should upgrade to "+res.Current+" by downloading the latest package Here https://github.com/hornbill/"+appName+"/releases/tag/v"+res.Current, true)
 	}
 }
 
-func loadConfig() AzureImportConfStruct {
+func loadConfig() azureImportConfStruct {
 	//-- Check Config File File Exists
 	cwd, _ := os.Getwd()
 	configurationFilePath := cwd + "/" + Flags.configFileName
@@ -275,29 +267,29 @@ func loadConfig() AzureImportConfStruct {
 	//-- New Decoder
 	decoder := json.NewDecoder(file)
 
-	eldapConf := AzureImportConfStruct{}
+	eConf := azureImportConfStruct{}
 
 	//-- Decode JSON
-	err := decoder.Decode(&eldapConf)
+	err := decoder.Decode(&eConf)
 	//-- Error Checking
 	if err != nil {
 		logger(4, "Error Decoding Configuration File: "+fmt.Sprintf("%v", err), true)
 	}
 
 	//-- Return New Congfig
-	return eldapConf
+	return eConf
 }
 
 //-- Function to Load Configuration File
 func validateConf() error {
 
 	//-- Check for API Key
-	if AzureImportConf.APIKey == "" {
+	if azureImportConf.APIKey == "" {
 		err := errors.New("API Key is not set")
 		return err
 	}
 	//-- Check for Instance ID
-	if AzureImportConf.InstanceID == "" {
+	if azureImportConf.InstanceID == "" {
 		err := errors.New("InstanceID is not set")
 		return err
 	}

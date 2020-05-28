@@ -24,7 +24,7 @@ func initXMLMC() {
 	hornbillImport.SetTimeout(Flags.configAPITimeout)
 	hornbillImport.SetJSONResponse(true)
 
-	pageSize = AzureImportConf.Advanced.PageSize
+	pageSize = azureImportConf.Advanced.PageSize
 
 	if pageSize == 0 {
 		pageSize = 100
@@ -43,7 +43,7 @@ func loadUsers() {
 }
 func loadUsersRoles() {
 	//-- Only Load if Enabled
-	if AzureImportConf.User.Role.Action != "Create" && AzureImportConf.User.Role.Action != "Update" && AzureImportConf.User.Role.Action != "Both" {
+	if azureImportConf.User.Role.Action != "Create" && azureImportConf.User.Role.Action != "Update" && azureImportConf.User.Role.Action != "Both" {
 		logger(1, "Skipping Loading Roles Due to Config", false)
 		return
 	}
@@ -59,7 +59,7 @@ func loadUsersRoles() {
 
 func loadSites() {
 	//-- Only Load if Enabled
-	if AzureImportConf.User.Site.Action != "Create" && AzureImportConf.User.Site.Action != "Update" && AzureImportConf.User.Site.Action != "Both" {
+	if azureImportConf.User.Site.Action != "Create" && azureImportConf.User.Site.Action != "Update" && azureImportConf.User.Site.Action != "Both" {
 		logger(1, "Skipping Loading Sites Due to Config", false)
 		return
 	}
@@ -74,8 +74,8 @@ func loadSites() {
 }
 func loadGroups() {
 	boolSkip := true
-	for index := range AzureImportConf.User.Org {
-		orgAction := AzureImportConf.User.Org[index]
+	for index := range azureImportConf.User.Org {
+		orgAction := azureImportConf.User.Org[index]
 		if orgAction.Action == "Create" || orgAction.Action == "Update" || orgAction.Action == "Both" {
 			boolSkip = false
 		}
@@ -95,8 +95,8 @@ func loadGroups() {
 }
 func loadUserGroups() {
 	boolSkip := true
-	for index := range AzureImportConf.User.Org {
-		orgAction := AzureImportConf.User.Org[index]
+	for index := range azureImportConf.User.Org {
+		orgAction := azureImportConf.User.Org[index]
 		if orgAction.Action == "Create" || orgAction.Action == "Update" || orgAction.Action == "Both" {
 			boolSkip = false
 		}
@@ -114,8 +114,8 @@ func loadUserGroups() {
 	logger(1, "User Orgs Loaded: "+fmt.Sprintf("%d", len(HornbillCache.UserGroups))+"\n", false)
 }
 
-//-- Check so that only data that relates to users in the DB data set are stored in the working set
-func userIDExistsInDB(userID string) bool {
+//-- Check so that only data that relates to users in the Azure data set are stored in the working set
+func userIDExistsInAzure(userID string) bool {
 	userID = strings.ToLower(userID)
 	_, present := HornbillCache.UsersWorking[userID]
 	return present
@@ -156,7 +156,7 @@ func getUserAccountsGroupsList(count uint64) {
 
 		//-- Push into Map of slices to userId = array of roles
 		for index := range JSONResp.Params.RowData.Row {
-			if userIDExistsInDB(JSONResp.Params.RowData.Row[index].HUserID) {
+			if userIDExistsInAzure(JSONResp.Params.RowData.Row[index].HUserID) {
 				HornbillCache.UserGroups[strings.ToLower(JSONResp.Params.RowData.Row[index].HUserID)] = append(HornbillCache.UserGroups[strings.ToLower(JSONResp.Params.RowData.Row[index].HUserID)], JSONResp.Params.RowData.Row[index].HGroupID)
 			}
 		}
@@ -262,7 +262,7 @@ func getUserAccountsRolesList(count uint64) {
 
 		//-- Push into Map of slices to userId = array of roles
 		for index := range JSONResp.Params.RowData.Row {
-			if userIDExistsInDB(JSONResp.Params.RowData.Row[index].HUserID) {
+			if userIDExistsInAzure(JSONResp.Params.RowData.Row[index].HUserID) {
 				HornbillCache.UserRoles[strings.ToLower(JSONResp.Params.RowData.Row[index].HUserID)] = append(HornbillCache.UserRoles[strings.ToLower(JSONResp.Params.RowData.Row[index].HUserID)], JSONResp.Params.RowData.Row[index].HRole)
 			}
 		}

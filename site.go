@@ -7,15 +7,15 @@ import (
 //-- Function to search for site
 func getSiteFromLookup(importData *userWorkingDataStruct) string {
 	//-- Check if Site Attribute is set
-	if AzureImportConf.User.Site.Value == "" {
+	if azureImportConf.User.Site.Value == "" {
 		logger(4, "Site Lookup is Enabled but Attribute is not Defined", false)
 		return ""
 	}
 	//-- Get Value of Attribute
-	logger(1, "DB Attribute for Site Lookup: "+AzureImportConf.User.Site.Value, false)
+	logger(1, "Azure Attribute for Site Lookup: "+azureImportConf.User.Site.Value, false)
 
 	//-- Get Value of Attribute
-	siteAttributeName := processComplexField(importData.DB, AzureImportConf.User.Site.Value)
+	siteAttributeName := processComplexField(importData.DB, azureImportConf.User.Site.Value)
 	siteAttributeName = processImportAction(importData.Custom, siteAttributeName)
 	logger(1, "Looking Up Site "+siteAttributeName, false)
 	siteIsInCache, SiteIDCache := siteInCache(siteAttributeName)

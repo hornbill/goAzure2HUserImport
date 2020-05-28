@@ -21,15 +21,15 @@ import (
 
 func loadImageFromValue(imageURI string) []byte {
 
-	//-- AD Looking the image URI is binary file so dont try and write that to the log
-	if AzureImportConf.User.Image.UploadType != "AD" {
+	//-- Azure Looking the image URI is binary file so dont try and write that to the log
+	if azureImportConf.User.Image.UploadType != "AD" {
 		logger(1, "Image Lookup URI: "+imageURI, false)
 	}
-	if strings.ToUpper(AzureImportConf.User.Image.UploadType) != "URL" {
+	if strings.ToUpper(azureImportConf.User.Image.UploadType) != "URL" {
 		// get binary to upload via WEBDAV and then set value to relative "session" URI
 		var imageB []byte
 		var Berr error
-		switch strings.ToUpper(AzureImportConf.User.Image.UploadType) {
+		switch strings.ToUpper(azureImportConf.User.Image.UploadType) {
 		case "AZURE":
 
 			strBearerToken, err := getBearerToken()
@@ -37,16 +37,13 @@ func loadImageFromValue(imageURI string) []byte {
 				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
 				return nil
 			}
-
-			//strTenant := AzureImportConf.AzureConf.Tenant
-			//strURL := "https://graph.microsoft.com/v1.0/" + strTenant + "/users/" + strings.Replace(UserID, "@", "%40", -1) + "/thumbnailPhoto?"
-			strURL := apiResource + "/" + AzureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(imageURI, "@", "%40", -1) + "/thumbnailPhoto?"
+			strURL := apiResource + "/" + azureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(imageURI, "@", "%40", -1) + "/thumbnailPhoto?"
 
 			data := url.Values{}
-			//data.Set("api-version", AzureImportConf.AzureConf.APIVersion)
+
 			strData := data.Encode()
 			strURL += strData
-			req, err := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))
+			req, err := http.NewRequest("GET", strURL, nil)
 			req.Header.Set("User-Agent", "Go-http-client/1.1")
 			req.Header.Set("Authorization", "Bearer "+strBearerToken)
 			duration := time.Second * time.Duration(30)
@@ -80,12 +77,12 @@ func loadImageFromValue(imageURI string) []byte {
 				logger(4, " [Image] Cannot read the body of the response", false)
 				return nil
 			}
-			//strContentType = resp.Header.Get("Content-Type")
+
 		//-- Get Local URL
 		case "URI":
 			//-- Add Support for local HTTPS URLS with invalid cert
 			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: AzureImportConf.User.Image.InsecureSkipVerify},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: azureImportConf.User.Image.InsecureSkipVerify},
 			}
 			duration := time.Second * time.Duration(Flags.configAPITimeout)
 			client := &http.Client{Transport: tr, Timeout: duration}
@@ -104,7 +101,7 @@ func loadImageFromValue(imageURI string) []byte {
 		case "AD":
 			imageB = []byte(imageURI)
 		default:
-			imageB, Berr = hex.DecodeString(imageURI[2:]) //stripping leading 0x
+			imageB, Berr = hex.DecodeString(imageURI[2:])
 			if Berr != nil {
 				logger(4, "Unsuccesful Decoding: "+fmt.Sprintf("%v", Berr), false)
 				return nil
@@ -113,7 +110,7 @@ func loadImageFromValue(imageURI string) []byte {
 		return imageB
 	}
 	//-- Must be a URL
-	response, err := http.Get(AzureImportConf.User.Image.URI)
+	response, err := http.Get(azureImportConf.User.Image.URI)
 	if err != nil {
 		logger(4, "Unsuccesful Download: "+fmt.Sprintf("%v", err), false)
 		return nil
@@ -132,8 +129,8 @@ func getImage(importData *userWorkingDataStruct) imageStruct {
 	var image imageStruct
 	var imageBytes []byte
 
-	//-- Work out the value of URI which may contain [] for DB attribute references or just a string
-	importData.ImageURI = processComplexField(importData.DB, AzureImportConf.User.Image.URI)
+	//-- Work out the value of URI which may contain [] for Azure attribute references or just a string
+	importData.ImageURI = processComplexField(importData.DB, azureImportConf.User.Image.URI)
 
 	//-- Try and Load from Cache
 	_, found := HornbillCache.Images[importData.ImageURI]
@@ -160,11 +157,11 @@ func userImageUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, b
 	//WebDAV upload
 	image := HornbillCache.Images[user.ImageURI]
 	value := ""
-	relLink := "session/" + user.Account.UserID + "." + AzureImportConf.User.Image.ImageType
+	relLink := "session/" + user.Account.UserID + "." + azureImportConf.User.Image.ImageType
 	strDAVurl := hIF.DavEndpoint + relLink
 
 	strContentType := "image/jpeg"
-	if AzureImportConf.User.Image.ImageType != "jpg" {
+	if azureImportConf.User.Image.ImageType != "jpg" {
 		strContentType = "image/png"
 	}
 
