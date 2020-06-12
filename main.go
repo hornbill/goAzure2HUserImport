@@ -183,7 +183,7 @@ func procFlags() {
 
 	//-- Output config
 	if !Flags.configVersion {
-		logger(2, "---- Azure Import Utility V"+fmt.Sprintf("%v", version)+" ----", true)
+		logger(2, "---- " + applicationName + " v"+fmt.Sprintf("%v", version)+" ----", true)
 		logger(2, "Flag - config "+Flags.configID, true)
 		logger(2, "Flag - logprefix "+Flags.configLogPrefix, true)
 		logger(2, "Flag - dryrun "+fmt.Sprintf("%v", Flags.configDryRun), true)

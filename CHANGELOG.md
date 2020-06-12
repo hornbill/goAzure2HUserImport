@@ -1,6 +1,12 @@
 # CHANGELOG
 
-## 2.5.0 (May 28th, 2020)
+## 2.5.1 (June 12th, 2020)
+
+Changes:
+
+- minor changes to be compatible with new crosscompile script
+
+## 2.5.0 (May 28th, 2020)
 
 Fix:
 
