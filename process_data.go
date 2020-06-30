@@ -52,43 +52,50 @@ func processData() {
 			continue
 		}
 		//-- Check Map no need to loop
+		userExists := false
 		if strings.ToLower(hornbillUserData.HUserID) == userID {
+			userExists = true
+			if strings.ToLower(azureImportConf.User.Operation) == "update" || strings.ToLower(azureImportConf.User.Operation) == "both" {
+				currentUser.Jobs.update = checkUserNeedsUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.update = checkUserNeedsUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateProfile = checkUserNeedsProfileUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.updateProfile = checkUserNeedsProfileUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateType = checkUserNeedsTypeUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.updateType = checkUserNeedsTypeUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateSite = checkUserNeedsSiteUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.updateSite = checkUserNeedsSiteUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateImage = checkUserNeedsImageUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.updateImage = checkUserNeedsImageUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateHomeOrg = checkUserNeedsHomeOrgUpdate(currentUser, hornbillUserData)
 
-			currentUser.Jobs.updateHomeOrg = checkUserNeedsHomeOrgUpdate(currentUser, hornbillUserData)
+				checkUserNeedsOrgUpdate(currentUser, hornbillUserData)
 
-			checkUserNeedsOrgUpdate(currentUser, hornbillUserData)
+				checkUserNeedsOrgRemoving(currentUser, hornbillUserData)
 
-			checkUserNeedsOrgRemoving(currentUser, hornbillUserData)
+				checkUserNeedsRoleUpdate(currentUser, hornbillUserData)
 
-			checkUserNeedsRoleUpdate(currentUser, hornbillUserData)
-
-			currentUser.Jobs.updateStatus = checkUserNeedsStatusUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateStatus = checkUserNeedsStatusUpdate(currentUser, hornbillUserData)
+			}
 		} else {
-			//-- Check for Password
-			setUserPasswordValueForCreate(currentUser)
-			//-- Set Site ID Based on Config
-			setUserSiteValueForCreate(currentUser, hornbillUserData)
-			setUserRolesalueForCreate(currentUser, hornbillUserData)
-			currentUser.Jobs.updateImage = checkUserNeedsImageCreate(currentUser, hornbillUserData)
-			checkUserNeedsOrgCreate(currentUser, hornbillUserData)
-			currentUser.Jobs.updateStatus = checkUserNeedsStatusCreate(currentUser, hornbillUserData)
-			currentUser.Jobs.updateHomeOrg = checkUserNeedsHomeOrgCreate(currentUser, hornbillUserData)
-			currentUser.Jobs.updateProfile = checkUserNeedsProfileUpdate(currentUser, hornbillUserData)
-			currentUser.Jobs.create = true
+			if strings.ToLower(azureImportConf.User.Operation) == "create" || strings.ToLower(azureImportConf.User.Operation) == "both" {
+				//-- Check for Password
+				setUserPasswordValueForCreate(currentUser)
+				//-- Set Site ID Based on Config
+				setUserSiteValueForCreate(currentUser, hornbillUserData)
+				setUserRolesalueForCreate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateImage = checkUserNeedsImageCreate(currentUser, hornbillUserData)
+				checkUserNeedsOrgCreate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateStatus = checkUserNeedsStatusCreate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateHomeOrg = checkUserNeedsHomeOrgCreate(currentUser, hornbillUserData)
+				currentUser.Jobs.updateProfile = checkUserNeedsProfileUpdate(currentUser, hornbillUserData)
+				currentUser.Jobs.create = true
+			}
 		}
 
 		loggerOutput := []string{
 			"User: " + userID,
+			"Operation: " + azureImportConf.User.Operation,
+			"User Exists: " + strconv.FormatBool(userExists),
 			"Create: " + strconv.FormatBool(currentUser.Jobs.create),
 			"Update: " + strconv.FormatBool(currentUser.Jobs.update),
 			"Update Type: " + strconv.FormatBool(currentUser.Jobs.updateType),

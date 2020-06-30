@@ -6,7 +6,7 @@ import (
 )
 
 //----- Constants -----
-const version = "2.5.1"
+const version = "2.6.0"
 const appName = "goAzure2HUserImport"
 const applicationName = "Azure Import Utility"
 
@@ -188,6 +188,7 @@ type azureImportConfStruct struct {
 	InstanceID string `json:"InstanceId"`
 	AzureConf  azureConfStruct
 	User       struct {
+		Operation      string               `json:"Operation"`
 		AccountMapping AccountMappingStruct `json:"AccountMapping"`
 		UserDN         string               `json:"UserDN"`
 		Type           struct {

@@ -16,7 +16,7 @@
 		],
 		"Debug": false,
 		"APIVersion": "v1.0",
-		"Search": "groups",
+		"Search": "users",
 		"UsersByGroupID": [
 			{
 				"ObjectID":"Group Object ID",
@@ -25,6 +25,7 @@
 		]
 	},
 	"User": {
+		"Operation":"Both",
 		"UserDN": "{{.userPrincipalName}}",
 		"AccountMapping": {
 			"UserID": "{{.userPrincipalName}}",
