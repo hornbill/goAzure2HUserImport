@@ -32,7 +32,7 @@ func userCreate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 	if user.Account.LoginID != "" {
 		hIF.SetParam("loginId", user.Account.LoginID)
 	}
-	if user.Account.EmployeeID != "" && serverBuild >= employeeIDMinServerBuild {
+	if user.Account.EmployeeID != "" {
 		hIF.SetParam("employeeId", user.Account.EmployeeID)
 	}
 	hIF.SetParam("name", user.Account.Name)
@@ -51,8 +51,8 @@ func userCreate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 	if user.Account.Site != "" {
 		hIF.SetParam("site", user.Account.Site)
 	}
-	if user.Account.Phone != "" {
-		hIF.SetParam("phone", user.Account.Phone)
+	if read_azure_string_collection(user.Account.Phone) != "" {
+		hIF.SetParam("phone", read_azure_string_collection(user.Account.Phone))
 	}
 	if user.Account.Email != "" {
 		hIF.SetParam("email", user.Account.Email)
@@ -120,7 +120,7 @@ func userUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 	if user.Account.LoginID != "" {
 		hIF.SetParam("loginId", user.Account.LoginID)
 	}
-	if user.Account.EmployeeID != "" && serverBuild >= employeeIDMinServerBuild {
+	if user.Account.EmployeeID != "" {
 		hIF.SetParam("employeeId", user.Account.EmployeeID)
 	}
 	hIF.SetParam("userType", user.Account.UserType)
@@ -138,8 +138,8 @@ func userUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer
 	if user.Account.Site != "" {
 		hIF.SetParam("site", user.Account.Site)
 	}
-	if user.Account.Phone != "" {
-		hIF.SetParam("phone", user.Account.Phone)
+	if read_azure_string_collection(user.Account.Phone) != "" {
+		hIF.SetParam("phone", read_azure_string_collection(user.Account.Phone))
 	}
 	if user.Account.Email != "" {
 		hIF.SetParam("email", user.Account.Email)
@@ -217,8 +217,8 @@ func userProfileUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct,
 	if user.Profile.Manager != "" {
 		hIF.SetParam("manager", user.Profile.Manager)
 	}
-	if user.Profile.WorkPhone != "" {
-		hIF.SetParam("workPhone", user.Profile.WorkPhone)
+	if read_azure_string_collection(user.Profile.WorkPhone) != "" {
+		hIF.SetParam("workPhone", read_azure_string_collection(user.Profile.WorkPhone))
 	}
 	if user.Profile.Qualifications != "" {
 		hIF.SetParam("qualifications", user.Profile.Qualifications)

@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -439,4 +440,19 @@ func getAzureManager(userPrincipalName string) (bool, string) {
 	}
 	logger(2, fmt.Sprintf("[Azure] Found %s results", strUserURL), false)
 	return true, ""
+}
+
+func read_azure_string_collection(text string, index_input ...int) string {
+	//default index = 0
+	index := 0
+	if len(index_input) > 0 {
+		index = index_input[0]
+	}
+	if azureImportConf.AzureConf.StringCollectionTweak {
+		r, _ := regexp.Compile("\"([^\",])*\"")	
+		t:=r.FindAllString(text,-1)[index]
+		return strings.Trim(t,`"`)
+	} else {
+		return text
+	}
 }

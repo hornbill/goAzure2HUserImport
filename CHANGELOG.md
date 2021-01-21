@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2.6.1
+
+Changes:
+
+- Moved from thumbnailPhoto to photo. Legitimate Azure Image sizes are: "48", "64", "96", "120", "240", "360", "432", "504", and "648" - please note they are all strings - IF set to "tn" it will pick up thumbnail as before (the new configuration file is defaulted to this to be on the safe side)
+- businessPhones is coming back as ["#phone#"] (a so-called "string collection"), so now stripping the phone number fields from any potential square bracket and double-quotes. Only "Phone" and "WorkPhone" (Profile) have been "treated" in this way. AzureConf.StringCollectionTweak needs to be set to true use.
+
+Fixes:
+
+- Fixed issue with Employee ID not applying because a serverBuild was incorrectly done
+
 ## 2.6.0
 
 Changes:

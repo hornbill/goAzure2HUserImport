@@ -32,13 +32,22 @@ func loadImageFromValue(imageURI string) []byte {
 		switch strings.ToUpper(azureImportConf.User.Image.UploadType) {
 		case "AZURE":
 
+			if azureImportConf.User.Image.ImageSize == "" {
+				azureImportConf.User.Image.ImageSize = azureDefaultImageSize
+			}
+
 			strBearerToken, err := getBearerToken()
 			if err != nil || strBearerToken == "" {
 				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
 				return nil
 			}
-			strURL := apiResource + "/" + azureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(imageURI, "@", "%40", -1) + "/thumbnailPhoto?"
-
+			
+			strURL := apiResource + "/" + azureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(imageURI, "@", "%40", -1)
+			if azureImportConf.User.Image.ImageSize == "tn" {
+				strURL = strURL + "/thumbnailPhoto?"
+			} else {
+				strURL = strURL + "/photos/" + azureImportConf.User.Image.ImageSize + "x" + azureImportConf.User.Image.ImageSize + "/$value"
+			}
 			data := url.Values{}
 
 			strData := data.Encode()

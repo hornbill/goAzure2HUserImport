@@ -6,18 +6,18 @@ import (
 )
 
 //----- Constants -----
-const version = "2.6.0"
+const version = "2.7.0"
 const appName = "goAzure2HUserImport"
 const applicationName = "Azure Import Utility"
 
 const apiResource = "https://graph.microsoft.com"
-const employeeIDMinServerBuild = 3241
+
+const azureDefaultImageSize = "tn" // tn = original thumbnail - this can be updated (to 504) once this has been alive for a while legitimate dimensions: 48x48, 64x64, 96x96, 120x120, 240x240, 360x360, 432x432, 504x504, and 648x648
 
 var mutexCounters = &sync.Mutex{}
 var bufferMutex = &sync.Mutex{}
 var importHistoryID string
 var maxGoroutines = 6
-var serverBuild int
 
 var globalBearerToken = ""
 var globalTokenExpiry int64
@@ -174,6 +174,7 @@ type azureConfStruct struct {
 	UserProperties []string
 	Debug          bool
 	APIVersion     string
+	StringCollectionTweak bool
 	Search         string
 	UsersByGroupID []groupConfStruct
 }
@@ -223,6 +224,7 @@ type azureImportConfStruct struct {
 			UploadType         string `json:"UploadType"`
 			InsecureSkipVerify bool   `json:"InsecureSkipVerify"`
 			ImageType          string `json:"ImageType"`
+			ImageSize          string `json:"ImageSize"`
 			URI                string `json:"URI"`
 		} `json:"Image"`
 		Site struct {
