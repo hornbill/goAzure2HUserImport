@@ -449,9 +449,17 @@ func read_azure_string_collection(text string, index_input ...int) string {
 		index = index_input[0]
 	}
 	if azureImportConf.AzureConf.StringCollectionTweak {
-		r, _ := regexp.Compile("\"([^\",])*\"")	
-		t:=r.FindAllString(text,-1)[index]
-		return strings.Trim(t,`"`)
+		r, _ := regexp.Compile("\"?([^\",])*\"?")	
+		t:=r.FindAllString(text,-1) //[index]
+		e := ""
+		if len(t) >= index {
+			e = t[index]
+		}
+		e = strings.Trim(e,`"`)
+		e = strings.Trim(e,`[`)
+		e = strings.Trim(e,`]`)
+		e = strings.Trim(e,`"`)
+		return e
 	} else {
 		return text
 	}

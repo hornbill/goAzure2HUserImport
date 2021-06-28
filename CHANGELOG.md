@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2.7.1
+
+Fixes:
+
+- Fixed issue with string collection
+- fix version numbering
+
 ## 2.6.1
 
 Changes:

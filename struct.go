@@ -6,7 +6,7 @@ import (
 )
 
 //----- Constants -----
-const version = "2.7.0"
+const version = "2.7.1"
 const appName = "goAzure2HUserImport"
 const applicationName = "Azure Import Utility"
 
