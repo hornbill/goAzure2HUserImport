@@ -12,7 +12,7 @@ version=${versiond//./_}
 version=${version// /}
 versiond=${versiond// /}
 #platforms="darwin/386 darwin/amd64 freebsd/386 freebsd/amd64 freebsd/arm linux/386 linux/amd64 linux/arm windows/386 windows/amd64"
-platforms="windows/386 windows/amd64 linux/386 linux/amd64 linux/arm darwin/386 darwin/amd64"
+platforms="windows/386 windows/amd64 linux/386 linux/amd64 linux/arm darwin/amd64"
 printf " ---- Building Azure User Import $versiond ---- \n"
 
 rm -rf "release/"

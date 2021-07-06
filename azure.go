@@ -36,7 +36,7 @@ func getBearerToken() (string, error) {
 	strURL := "https://login.microsoftonline.com/" + strTentant + "/oauth2/token"
 
 	var xmlmcstr = []byte(strData)
-	req, err := http.NewRequest("POST", strURL, bytes.NewBuffer(xmlmcstr))
+	req, _ := http.NewRequest("POST", strURL, bytes.NewBuffer(xmlmcstr))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "Go-http-client/1.1")
 	req.Header.Set("Accept", "text/json")
@@ -62,14 +62,14 @@ func getBearerToken() (string, error) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.New("Cant read the body of the response")
+		return "", errors.New("cant read the body of the response")
 	}
 
 	var f interface{}
 	qerr := json.Unmarshal(body, &f)
 
 	if qerr != nil {
-		return "", errors.New("Cant read the JSON")
+		return "", errors.New("cant read the JSON")
 	}
 
 	q := f.(map[string]interface{})
@@ -113,7 +113,7 @@ func queryAzure() bool {
 	strData := data.Encode()
 	strURL += strData
 	logger(1, "[AZURE] API URL: "+strURL, false)
-	req, err := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))
+	req, _ := http.NewRequest("GET", strURL, nil) //, bytes.NewBuffer(""))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Go-http-client/1.1")
 	req.Header.Set("Authorization", "Bearer "+strBearerToken)
@@ -208,7 +208,7 @@ func queryGroup(groupID string) bool {
 		strURL += "&$skiptoken=" + strAzurePagerToken
 	}
 	logger(1, "[AZURE] API URL: "+strURL, false)
-	req, err := http.NewRequest("GET", strURL, nil)
+	req, _ := http.NewRequest("GET", strURL, nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Go-http-client/1.1")
 	req.Header.Set("Authorization", "Bearer "+strBearerToken)
@@ -295,7 +295,7 @@ func queryGroup(groupID string) bool {
 							strData := data.Encode()
 							strUserURL += "?" + strData
 						}
-						req, err := http.NewRequest("GET", strUserURL, nil)
+						req, _ := http.NewRequest("GET", strUserURL, nil)
 						req.Header.Set("Content-Type", "application/json")
 						req.Header.Set("User-Agent", "Go-http-client/1.1")
 						req.Header.Set("Authorization", "Bearer "+strCurrBearerToken)
@@ -384,7 +384,7 @@ func getAzureManager(userPrincipalName string) (bool, string) {
 	strData := data.Encode()
 	strURL += strData
 	logger(1, "[AZURE] API URL: "+strURL, false)
-	req, err := http.NewRequest("GET", strURL, nil)
+	req, _ := http.NewRequest("GET", strURL, nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Go-http-client/1.1")
 	req.Header.Set("Authorization", "Bearer "+strBearerToken)
@@ -449,16 +449,16 @@ func read_azure_string_collection(text string, index_input ...int) string {
 		index = index_input[0]
 	}
 	if azureImportConf.AzureConf.StringCollectionTweak {
-		r, _ := regexp.Compile("\"?([^\",])*\"?")	
-		t:=r.FindAllString(text,-1) //[index]
+		r, _ := regexp.Compile("\"?([^\",])*\"?")
+		t := r.FindAllString(text, -1) //[index]
 		e := ""
 		if len(t) >= index {
 			e = t[index]
 		}
-		e = strings.Trim(e,`"`)
-		e = strings.Trim(e,`[`)
-		e = strings.Trim(e,`]`)
-		e = strings.Trim(e,`"`)
+		e = strings.Trim(e, `"`)
+		e = strings.Trim(e, `[`)
+		e = strings.Trim(e, `]`)
+		e = strings.Trim(e, `"`)
 		return e
 	} else {
 		return text

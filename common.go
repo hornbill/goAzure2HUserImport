@@ -68,8 +68,7 @@ func getProfileFieldValue(u *map[string]interface{}, s string, custom map[string
 
 //-- Match any value wrapped in [] and get its Azure Attribute Value
 func processComplexField(u *map[string]interface{}, s string) string {
-	var p map[string]string
-	p = make(map[string]string)
+	p := make(map[string]string)
 	for key, value := range *u {
 		if value != nil {
 			p[key] = fmt.Sprintf("%s", value)
@@ -420,4 +419,3 @@ func getLastHistory() {
 	}
 
 }
-

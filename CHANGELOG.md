@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2.7.2
+
+Change:
+
+- Rebuilt using latest version of goApiLib, to fix possible issue with connections via a proxy
+- Tidied up linter warnings
+
 ## 2.7.1
 
 Fixes:

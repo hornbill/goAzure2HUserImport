@@ -6,7 +6,7 @@ import (
 )
 
 //----- Constants -----
-const version = "2.7.1"
+const version = "2.7.2"
 const appName = "goAzure2HUserImport"
 const applicationName = "Azure Import Utility"
 
@@ -166,17 +166,17 @@ var counters struct {
 }
 
 type azureConfStruct struct {
-	Tenant         string
-	ClientID       string
-	ClientSecret   string
-	UserFilter     string
-	UserID         string
-	UserProperties []string
-	Debug          bool
-	APIVersion     string
+	Tenant                string
+	ClientID              string
+	ClientSecret          string
+	UserFilter            string
+	UserID                string
+	UserProperties        []string
+	Debug                 bool
+	APIVersion            string
 	StringCollectionTweak bool
-	Search         string
-	UsersByGroupID []groupConfStruct
+	Search                string
+	UsersByGroupID        []groupConfStruct
 }
 
 type groupConfStruct struct {
@@ -441,22 +441,6 @@ type xmlmcGroupListResponse struct {
 	} `json:"params"`
 	State stateJSONStruct `json:"state"`
 }
-type xmlmcConfigLoadResponse struct {
-	Params struct {
-		PrimaryEntityData struct {
-			Record struct {
-				HDefinition string `json:"h_definition"`
-			} `json:"record"`
-		} `json:"primaryEntityData"`
-	} `json:"params"`
-	State stateJSONStruct `json:"state"`
-}
-type xmlmcKeySafeResponse struct {
-	Params struct {
-		Data string `json:"data"`
-	} `json:"params"`
-	State stateJSONStruct `json:"state"`
-}
 type xmlmcCountResponse struct {
 	Params struct {
 		RowData struct {
@@ -496,12 +480,4 @@ type stateJSONStruct struct {
 type xmlmcResponse struct {
 	MethodResult string          `json:"status,attr"`
 	State        stateJSONStruct `json:"state"`
-}
-
-type xmlmcLicenseInfo struct {
-	MethodResult string `json:"status,attr"`
-	Params       struct {
-		ServerBuild int
-	} `json:"params"`
-	State stateJSONStruct `json:"state"`
 }

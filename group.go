@@ -44,30 +44,6 @@ func getOrgFromLookup(l *userWorkingDataStruct, orgValue string, orgType int) st
 	return ""
 }
 
-func isUserAMember(l *map[string]interface{}, memberOf string) bool {
-	logger(1, "Checking if user is a memeber of Azure Group: "+memberOf, false)
-
-	//-- Load Azure memberof
-	var userAdGroups []string
-	//userAdGroups := l.GetAttributeValues("memberof")
-	if len(userAdGroups) == 0 {
-		logger(1, "User is not a Member of any Azure Groups ", false)
-		return false
-	}
-
-	//-- Range over
-	for index := range userAdGroups {
-		logger(1, "Checking Azure Group: "+userAdGroups[index], false)
-		if userAdGroups[index] == memberOf {
-			logger(1, "User is a Member of Azure Group: "+memberOf, false)
-			return true
-		}
-	}
-
-	logger(1, "User is not a Member of Azure Group: "+memberOf, false)
-	return false
-}
-
 func userGroupsUpdate(hIF *apiLib.XmlmcInstStruct, user *userWorkingDataStruct, buffer *bytes.Buffer) (bool, error) {
 
 	for groupIndex := range user.Groups {

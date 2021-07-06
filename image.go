@@ -41,7 +41,7 @@ func loadImageFromValue(imageURI string) []byte {
 				logger(4, " [Azure] BearerToken Error: "+fmt.Sprintf("%v", err), true)
 				return nil
 			}
-			
+
 			strURL := apiResource + "/" + azureImportConf.AzureConf.APIVersion + "/users/" + strings.Replace(imageURI, "@", "%40", -1)
 			if azureImportConf.User.Image.ImageSize == "tn" {
 				strURL = strURL + "/thumbnailPhoto?"
@@ -52,7 +52,7 @@ func loadImageFromValue(imageURI string) []byte {
 
 			strData := data.Encode()
 			strURL += strData
-			req, err := http.NewRequest("GET", strURL, nil)
+			req, _ := http.NewRequest("GET", strURL, nil)
 			req.Header.Set("User-Agent", "Go-http-client/1.1")
 			req.Header.Set("Authorization", "Bearer "+strBearerToken)
 			duration := time.Second * time.Duration(30)
